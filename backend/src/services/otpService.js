@@ -1,4 +1,4 @@
-
+import 'dotenv/config'
 import crypto from 'crypto'
 import { supabase } from '../config/supabase.js'
 import { sendEmail } from './emailService.js'
@@ -8,10 +8,16 @@ const MAX_OTP_ATTEMPTS = 5
 
 const VALID_PURPOSES = ['activation', 'password_reset']
 
-function hashOtp(otp) {
+function hashOtp(otp, identifier, purpose) {
+  const secret = process.env.OTP_HASH_SECRET
+
+  if (!secret) {
+    throw new Error('OTP_HASH_SECRET is not configured.')
+  }
+
   return crypto
-    .createHash('sha256')
-    .update(otp)
+    .createHmac('sha256', secret)
+    .update(`${purpose}:${identifier}:${otp}`)
     .digest('hex')
 }
 
@@ -24,23 +30,27 @@ export async function issueOtp({ loginIdentifier, email, purpose }) {
     throw new Error('Invalid OTP purpose.')
   }
 
-  if (!loginIdentifier || !email) {
+  if (
+    typeof loginIdentifier !== 'string' ||
+    typeof email !== 'string' ||
+    !loginIdentifier.trim() ||
+    !email.trim()
+  ) {
     throw new Error('Login identifier and email are required.')
   }
 
   const identifier = loginIdentifier.trim()
   const recipient = email.trim().toLowerCase()
 
-  // Generate a cryptographically secure 6-digit OTP.
   const otp = crypto.randomInt(100000, 1000000).toString()
-  const otpHash = hashOtp(otp)
+  const otpHash = hashOtp(otp, identifier, purpose)
 
   const now = new Date()
   const expiresAt = new Date(
     now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000
   ).toISOString()
 
-  // Invalidate previous unused challenges for this purpose.
+  // Invalidate previous unused challenges for this identifier and purpose.
   const { error: invalidateError } = await supabase
     .from('auth_challenges')
     .update({ consumed_at: now.toISOString() })
@@ -52,7 +62,6 @@ export async function issueOtp({ loginIdentifier, email, purpose }) {
     throw new Error('Unable to prepare OTP verification.')
   }
 
-  // Store only the OTP hash.
   const { data: challenge, error: insertError } = await supabase
     .from('auth_challenges')
     .insert({
@@ -121,6 +130,7 @@ export async function issueOtp({ loginIdentifier, email, purpose }) {
       })
       .eq('id', challenge.id)
 
+    console.error('OTP delivery failed:', error.message)
     throw new Error('Unable to deliver verification email.')
   }
 }
@@ -134,14 +144,19 @@ export async function verifyOtp({
     throw new Error('Invalid OTP purpose.')
   }
 
-  if (!loginIdentifier || !/^\d{6}$/.test(String(otp))) {
+  if (
+    typeof loginIdentifier !== 'string' ||
+    !/^\d{6}$/.test(String(otp))
+  ) {
     throw new Error('Invalid or expired OTP.')
   }
+
+  const identifier = loginIdentifier.trim()
 
   const { data: challenge, error } = await supabase
     .from('auth_challenges')
     .select('*')
-    .eq('login_identifier', loginIdentifier.trim())
+    .eq('login_identifier', identifier)
     .eq('purpose', purpose)
     .is('consumed_at', null)
     .order('created_at', { ascending: false })
@@ -164,7 +179,11 @@ export async function verifyOtp({
     throw new Error('Maximum OTP attempts exceeded.')
   }
 
-  const candidateHash = Buffer.from(hashOtp(String(otp)), 'hex')
+  const candidateHash = Buffer.from(
+    hashOtp(String(otp), identifier, purpose),
+    'hex'
+  )
+
   const storedHash = Buffer.from(challenge.otp_hash, 'hex')
 
   const isMatch =
@@ -172,37 +191,45 @@ export async function verifyOtp({
     crypto.timingSafeEqual(candidateHash, storedHash)
 
   if (!isMatch) {
-    const { error: attemptError } = await supabase
+    // Compare-and-update prevents concurrent requests from
+    // overwriting each other's attempt counters.
+    const { data: updated, error: attemptError } = await supabase
       .from('auth_challenges')
-      .update({
-        attempts: challenge.attempts + 1,
-      })
+      .update({ attempts: challenge.attempts + 1 })
       .eq('id', challenge.id)
+      .eq('attempts', challenge.attempts)
+      .is('verified_at', null)
+      .is('consumed_at', null)
+      .select('id')
+      .maybeSingle()
 
-    if (attemptError) {
-      throw new Error('Unable to process OTP verification.')
+    if (attemptError || !updated) {
+      throw new Error('Invalid or expired OTP.')
     }
 
     throw new Error('Invalid or expired OTP.')
   }
 
-  const { error: verifyError } = await supabase
+  // Only one concurrent request can verify this challenge.
+  const { data: verified, error: verifyError } = await supabase
     .from('auth_challenges')
-    .update({
-      verified_at: new Date().toISOString(),
-    })
+    .update({ verified_at: new Date().toISOString() })
     .eq('id', challenge.id)
+    .eq('attempts', challenge.attempts)
     .is('verified_at', null)
     .is('consumed_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('id')
+    .maybeSingle()
 
-  if (verifyError) {
-    throw new Error('Unable to verify OTP.')
+  if (verifyError || !verified) {
+    throw new Error('Invalid or expired OTP.')
   }
 
   return {
     success: true,
     message: 'OTP verified successfully.',
-    challengeId: challenge.id,
+    challengeId: verified.id,
   }
 }
 
@@ -214,12 +241,20 @@ export async function consumeVerifiedOtp({
     throw new Error('Invalid OTP purpose.')
   }
 
+  if (
+    typeof loginIdentifier !== 'string' ||
+    !loginIdentifier.trim()
+  ) {
+    throw new Error('Login identifier is required.')
+  }
+
+  const identifier = loginIdentifier.trim()
   const now = new Date().toISOString()
 
   const { data: challenge, error } = await supabase
     .from('auth_challenges')
     .select('id')
-    .eq('login_identifier', loginIdentifier.trim())
+    .eq('login_identifier', identifier)
     .eq('purpose', purpose)
     .not('verified_at', 'is', null)
     .is('consumed_at', null)
@@ -232,13 +267,18 @@ export async function consumeVerifiedOtp({
     throw new Error('Verified OTP not found or expired.')
   }
 
-  const { error: consumeError } = await supabase
+  // The conditional update ensures only one request consumes it.
+  const { data: consumed, error: consumeError } = await supabase
     .from('auth_challenges')
     .update({ consumed_at: now })
     .eq('id', challenge.id)
     .is('consumed_at', null)
+    .not('verified_at', 'is', null)
+    .gt('expires_at', now)
+    .select('id')
+    .maybeSingle()
 
-  if (consumeError) {
+  if (consumeError || !consumed) {
     throw new Error('Unable to complete OTP verification.')
   }
 
