@@ -1,16 +1,21 @@
 
-import { authenticateUser } from './middleware/authMiddleware.js'
-import { authorizeRoles } from './middleware/roleMiddleware.js'
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
+
 import { supabase } from './config/supabase.js'
+
+import { authenticateUser } from './middleware/authMiddleware.js'
+import { authorizeRoles } from './middleware/roleMiddleware.js'
+
 import authRoutes from './routes/authRoutes.js'
+import adminRoutes from './routes/adminRoutes.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
+// SECURITY MIDDLEWARE
 app.use(helmet())
 
 app.use(cors({
@@ -19,6 +24,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '1mb' }))
 
+// ROOT ROUTE
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -26,6 +32,7 @@ app.get('/', (req, res) => {
   })
 })
 
+// DATABASE HEALTH CHECK
 app.get('/api/health', async (req, res) => {
   try {
     const { error } = await supabase
@@ -60,7 +67,7 @@ app.get('/api/health', async (req, res) => {
   }
 })
 
-// Protected student test endpoint
+// PROTECTED STUDENT TEST ENDPOINT
 app.get(
   '/api/protected/student-test',
   authenticateUser,
@@ -74,7 +81,7 @@ app.get(
   }
 )
 
-// Protected faculty test endpoint
+// PROTECTED FACULTY TEST ENDPOINT
 app.get(
   '/api/protected/faculty-test',
   authenticateUser,
@@ -88,28 +95,33 @@ app.get(
   }
 )
 
-// Authentication routes
+// AUTHENTICATION ROUTES
 app.use('/api/auth', authRoutes)
 
-// Temporary database schema diagnostics
+// UNIVERSITY ADMIN ROUTES
+// Every Admin route is protected by authenticateUser
+// and authorizeRoles('admin') inside adminRoutes.js.
+app.use('/api/admin', adminRoutes)
+
+// TEMPORARY DATABASE SCHEMA DIAGNOSTICS
 app.get('/api/diagnostics/schema', async (req, res) => {
   try {
     const tables = [
-  'profiles',
-  'student_details',
-  'faculty_details',
-  'auth_challenges',
-  'schools',
-  'departments',
-  'specializations',
-  'student_academic_records',
-  'academic_years',
-  'academic_terms',
-  'electives',
-  'elective_offerings',
-  'enrollment_periods',
-  'enrollments',
-]
+      'profiles',
+      'student_details',
+      'faculty_details',
+      'auth_challenges',
+      'schools',
+      'departments',
+      'specializations',
+      'student_academic_records',
+      'academic_years',
+      'academic_terms',
+      'electives',
+      'elective_offerings',
+      'enrollment_periods',
+      'enrollments',
+    ]
 
     const results = {}
 
@@ -147,7 +159,7 @@ app.get('/api/diagnostics/schema', async (req, res) => {
   }
 })
 
-// Temporary read-only trigger and function diagnostics
+// TEMPORARY READ-ONLY TRIGGER AND FUNCTION DIAGNOSTICS
 app.get('/api/diagnostics/triggers', async (req, res) => {
   try {
     const { data, error } = await supabase.rpc(
@@ -179,6 +191,7 @@ app.get('/api/diagnostics/triggers', async (req, res) => {
   }
 })
 
+// 404 HANDLER
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -186,6 +199,7 @@ app.use((req, res) => {
   })
 })
 
+// START SERVER
 app.listen(PORT, () => {
   console.log(`SmartSelect backend running on http://localhost:${PORT}`)
 })

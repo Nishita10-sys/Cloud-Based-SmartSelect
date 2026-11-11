@@ -15,6 +15,7 @@ import {
 
 import './App.css'
 import authService from './services/authService'
+import AdminDashboard from './components/admin/AdminDashboard'
 
 function App() {
   const [screen, setScreen] = useState('login')
@@ -315,6 +316,16 @@ function App() {
       description: 'Your university account is authenticated.',
     },
   }[screen]
+
+  // UNIVERSITY ADMIN DASHBOARD
+  if (screen === 'dashboard' && profile?.role === 'admin') {
+    return (
+      <AdminDashboard
+        profile={profile}
+        onLogout={handleLogout}
+      />
+    )
+  }
 
   return (
     <main className="login-page">
@@ -803,7 +814,7 @@ function App() {
               </form>
             )}
 
-            {/* AUTHENTICATED PLACEHOLDER */}
+            {/* AUTHENTICATED PLACEHOLDER FOR OTHER ROLES */}
 
             {screen === 'dashboard' && (
               <div className="login-form">
