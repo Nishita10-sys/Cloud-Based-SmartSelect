@@ -16,6 +16,7 @@ import {
 import './App.css'
 import authService from './services/authService'
 import AdminDashboard from './components/admin/AdminDashboard'
+import SchoolDashboard from './components/school/SchoolDashboard'
 
 function App() {
   const [screen, setScreen] = useState('login')
@@ -29,6 +30,9 @@ function App() {
   const [resetToken, setResetToken] = useState('')
 
   const [profile, setProfile] = useState(null)
+
+  // SELECTED SCHOOL
+  const [selectedSchool, setSelectedSchool] = useState(null)
 
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -90,6 +94,7 @@ function App() {
       const userResult = await authService.getCurrentUser()
 
       setProfile(userResult.data)
+      setSelectedSchool(null)
       changeScreen('dashboard')
 
     } catch (error) {
@@ -117,7 +122,10 @@ function App() {
 
       changeScreen('activationPassword')
 
-      showMessage('Email verified successfully. Create your permanent password.', 'success')
+      showMessage(
+        'Email verified successfully. Create your permanent password.',
+        'success'
+      )
 
     } catch (error) {
       showMessage(getErrorMessage(error), 'error')
@@ -207,7 +215,10 @@ function App() {
 
       changeScreen('resetPassword')
 
-      showMessage('Email verification successful. Create your new password.', 'success')
+      showMessage(
+        'Email verification successful. Create your new password.',
+        'success'
+      )
 
     } catch (error) {
       showMessage(getErrorMessage(error), 'error')
@@ -257,6 +268,22 @@ function App() {
     }
   }
 
+  // OPEN SELECTED SCHOOL
+  const handleOpenSchool = (school) => {
+    if (!school || !school.id || !school.is_active) {
+      return
+    }
+
+    setSelectedSchool(school)
+    setScreen('schoolDashboard')
+  }
+
+  // RETURN TO UNIVERSITY DASHBOARD
+  const handleBackToUniversity = () => {
+    setSelectedSchool(null)
+    setScreen('dashboard')
+  }
+
   // LOGOUT
   const handleLogout = async () => {
     setIsLoading(true)
@@ -268,6 +295,7 @@ function App() {
       authService.clearSession()
     } finally {
       setProfile(null)
+      setSelectedSchool(null)
       setIdentifier('')
       setPassword('')
       changeScreen('login')
@@ -323,10 +351,20 @@ function App() {
       <AdminDashboard
         profile={profile}
         onLogout={handleLogout}
+        onOpenSchool={handleOpenSchool}
       />
     )
   }
 
+  // SCHOOL DASHBOARD
+if (screen === 'schoolDashboard' && profile?.role === 'admin') {
+  return (
+    <SchoolDashboard
+      school={selectedSchool}
+      onBack={handleBackToUniversity}
+    />
+  )
+}
   return (
     <main className="login-page">
       <section className="login-layout">
@@ -487,9 +525,7 @@ function App() {
                     <button
                       type="button"
                       className="text-button"
-                      onClick={() => {
-                        changeScreen('forgot')
-                      }}
+                      onClick={() => changeScreen('forgot')}
                     >
                       Forgot password?
                     </button>

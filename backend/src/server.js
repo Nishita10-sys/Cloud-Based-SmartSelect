@@ -11,6 +11,7 @@ import { authorizeRoles } from './middleware/roleMiddleware.js'
 
 import authRoutes from './routes/authRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
+import schoolRoutes from './routes/schoolRoutes.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -103,6 +104,10 @@ app.use('/api/auth', authRoutes)
 // and authorizeRoles('admin') inside adminRoutes.js.
 app.use('/api/admin', adminRoutes)
 
+// SCHOOL DASHBOARD ROUTES
+// Protected for authenticated University Admins.
+app.use('/api/schools', schoolRoutes)
+
 // TEMPORARY DATABASE SCHEMA DIAGNOSTICS
 app.get('/api/diagnostics/schema', async (req, res) => {
   try {
@@ -119,6 +124,7 @@ app.get('/api/diagnostics/schema', async (req, res) => {
       'academic_terms',
       'electives',
       'elective_offerings',
+      'offering_eligibility',
       'enrollment_periods',
       'enrollments',
     ]
