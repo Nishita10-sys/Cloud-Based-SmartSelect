@@ -162,3 +162,163 @@ export async function setDepartmentStatus(
 
   return data
 }
+
+// ======================================================
+// STUDENTS
+// ======================================================
+
+// Retrieve students belonging to one selected school.
+export async function getSchoolStudents(schoolId) {
+  // 1. Retrieve active academic records for this school.
+  const { data: academicRecords, error: academicError } = await supabase
+    .from('student_academic_records')
+    .select(`
+      id,
+      student_id,
+      school_id,
+      department_id,
+      specialization_id,
+      academic_year_level,
+      division,
+      roll_number,
+      record_status,
+      created_at
+    `)
+    .eq('school_id', schoolId)
+    .eq('record_status', 'active')
+    .order('created_at', { ascending: false })
+
+  if (academicError) throw new Error(academicError.message)
+
+  if (!academicRecords || academicRecords.length === 0) {
+    return []
+  }
+
+  // 2. Keep only the latest record for each student.
+  const latestRecords = new Map()
+
+  for (const record of academicRecords) {
+    if (!latestRecords.has(record.student_id)) {
+      latestRecords.set(record.student_id, record)
+    }
+  }
+
+  const records = [...latestRecords.values()]
+  const studentIds = records.map(record => record.student_id)
+
+  // 3. Retrieve student enrollment details.
+  const { data: studentDetails, error: studentError } = await supabase
+    .from('student_details')
+    .select(`
+      id,
+      profile_id,
+      enrollment_number,
+      admission_date,
+      admission_batch
+    `)
+    .in('id', studentIds)
+
+  if (studentError) throw new Error(studentError.message)
+
+  const details = studentDetails || []
+
+  if (details.length === 0) return []
+
+  const profileIds = details.map(student => student.profile_id)
+
+  // 4. Retrieve student account information.
+  const { data: profiles, error: profileError } = await supabase
+    .from('profiles')
+    .select(`
+      id,
+      full_name,
+      email,
+      phone,
+      account_status,
+      force_password_change
+    `)
+    .in('id', profileIds)
+    .eq('role', 'student')
+
+  if (profileError) throw new Error(profileError.message)
+
+  // 5. Retrieve department and specialization information.
+  const departmentIds = [
+    ...new Set(records.map(record => record.department_id)),
+  ]
+
+  const specializationIds = [
+    ...new Set(records.map(record => record.specialization_id)),
+  ]
+
+  const { data: departments, error: departmentError } = await supabase
+    .from('departments')
+    .select('id, name, code')
+    .in('id', departmentIds)
+
+  if (departmentError) throw new Error(departmentError.message)
+
+  let specializations = []
+
+  if (specializationIds.length > 0) {
+    const { data, error } = await supabase
+      .from('specializations')
+      .select('id, name, code')
+      .in('id', specializationIds)
+
+    if (error) throw new Error(error.message)
+
+    specializations = data || []
+  }
+
+  // 6. Create lookup maps.
+  const profileMap = new Map(
+    (profiles || []).map(profile => [profile.id, profile])
+  )
+
+  const departmentMap = new Map(
+    (departments || []).map(department => [department.id, department])
+  )
+
+  const specializationMap = new Map(
+    specializations.map(item => [item.id, item])
+  )
+
+  const detailMap = new Map(
+    details.map(student => [student.id, student])
+  )
+
+  // 7. Combine all student information.
+  return records
+    .map(record => {
+      const student = detailMap.get(record.student_id)
+
+      if (!student) return null
+
+      const profile = profileMap.get(student.profile_id)
+
+      if (!profile) return null
+
+      return {
+        profile_id: profile.id,
+        student_id: student.id,
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        account_status: profile.account_status,
+        force_password_change: profile.force_password_change,
+        enrollment_number: student.enrollment_number,
+        admission_date: student.admission_date,
+        admission_batch: student.admission_batch,
+        academic_year_level: record.academic_year_level,
+        division: record.division,
+        roll_number: record.roll_number,
+        department: departmentMap.get(record.department_id) || null,
+        specialization:
+          specializationMap.get(record.specialization_id) || null,
+        academic_record_id: record.id,
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+}

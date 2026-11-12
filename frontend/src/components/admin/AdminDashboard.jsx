@@ -17,10 +17,12 @@ import {
   MoreVertical,
   Pencil,
   Power,
+  CalendarDays,
 } from 'lucide-react'
 
 import adminService from '../../services/adminService'
 import SchoolFormModal from './SchoolFormModal'
+import AcademicYearManagement from './AcademicYearManagement'
 
 function AdminDashboard({ profile, onLogout, onOpenSchool }) {
   const [dashboard, setDashboard] = useState(null)
@@ -37,7 +39,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [savingSchoolId, setSavingSchoolId] = useState(null)
 
-  // LOAD UNIVERSITY DASHBOARD
   const loadDashboard = async () => {
     setLoading(true)
     setError('')
@@ -65,7 +66,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     loadDashboard()
   }, [])
 
-  // SEARCH SCHOOLS
   const filteredSchools = useMemo(() => {
     const schools = dashboard?.schools || []
     const search = searchTerm.trim().toLowerCase()
@@ -78,24 +78,20 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     )
   }, [dashboard, searchTerm])
 
-  // SCROLL TO SCHOOL MANAGEMENT
-  const openSchoolManagement = () => {
-    document
-      .getElementById('school-management')
-      ?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
+  const scrollToSection = (sectionId) => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
   }
 
-  const handleSchoolManagementKeyDown = (event) => {
+  const handleNavigationKeyDown = (event, sectionId) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
-      openSchoolManagement()
+      scrollToSection(sectionId)
     }
   }
 
-  // OPEN ADD SCHOOL MODAL
   const handleAddSchool = () => {
     setSelectedSchool(null)
     setModalMode('add')
@@ -105,7 +101,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     setModalOpen(true)
   }
 
-  // OPEN EDIT SCHOOL MODAL
   const handleEditSchool = (school) => {
     setSelectedSchool(school)
     setModalMode('edit')
@@ -115,15 +110,12 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     setModalOpen(true)
   }
 
-  // CLOSE MODAL
   const handleCloseModal = () => {
     if (savingSchool) return
-
     setModalOpen(false)
     setSelectedSchool(null)
   }
 
-  // CREATE OR UPDATE SCHOOL
   const handleSchoolSubmit = async (schoolData) => {
     setSavingSchool(true)
     setError('')
@@ -131,21 +123,15 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
 
     try {
       if (modalMode === 'edit' && selectedSchool) {
-        await adminService.updateSchool(
-          selectedSchool.id,
-          schoolData
-        )
-
+        await adminService.updateSchool(selectedSchool.id, schoolData)
         setFeedback('School details updated successfully.')
       } else {
         await adminService.createSchool(schoolData)
-
         setFeedback('New school created successfully.')
       }
 
       setModalOpen(false)
       setSelectedSchool(null)
-
       await loadDashboard()
     } catch (err) {
       setError(
@@ -158,7 +144,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     }
   }
 
-  // ACTIVATE OR DEACTIVATE SCHOOL
   const handleSchoolStatus = async (school) => {
     const action = school.is_active ? 'deactivate' : 'activate'
 
@@ -233,7 +218,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
     <main className="admin-page">
 
       {/* SIDEBAR */}
-
       <aside className="admin-sidebar">
 
         <div className="admin-brand">
@@ -253,7 +237,15 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
             UNIVERSITY ADMINISTRATION
           </span>
 
-          <div className="admin-nav-item active">
+          <div
+            className="admin-nav-item active"
+            role="button"
+            tabIndex={0}
+            onClick={() => scrollToSection('university-overview')}
+            onKeyDown={(event) =>
+              handleNavigationKeyDown(event, 'university-overview')
+            }
+          >
             <Building2 size={19} />
             <span>University Overview</span>
           </div>
@@ -262,11 +254,26 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
             className="admin-nav-item"
             role="button"
             tabIndex={0}
-            onClick={openSchoolManagement}
-            onKeyDown={handleSchoolManagementKeyDown}
+            onClick={() => scrollToSection('school-management')}
+            onKeyDown={(event) =>
+              handleNavigationKeyDown(event, 'school-management')
+            }
           >
             <School size={19} />
             <span>School Management</span>
+          </div>
+
+          <div
+            className="admin-nav-item"
+            role="button"
+            tabIndex={0}
+            onClick={() => scrollToSection('academic-year-management')}
+            onKeyDown={(event) =>
+              handleNavigationKeyDown(event, 'academic-year-management')
+            }
+          >
+            <CalendarDays size={19} />
+            <span>Academic Year Management</span>
           </div>
 
         </div>
@@ -294,20 +301,16 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
           </button>
 
         </div>
-
       </aside>
 
       {/* MAIN CONTENT */}
-
       <section className="admin-main">
 
         <header className="admin-topbar">
-
           <div>
             <span className="admin-breadcrumb">
               SmartSelect / Administration
             </span>
-
             <h1>University Dashboard</h1>
           </div>
 
@@ -316,40 +319,35 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
               University Admin
             </span>
           </div>
-
         </header>
 
         <div className="admin-content">
 
           {/* WELCOME */}
-
-          <section className="admin-welcome">
-
+          <section
+            className="admin-welcome"
+            id="university-overview"
+          >
             <div>
               <span>UNIVERSITY OVERVIEW</span>
-
               <h2>
                 Welcome, {profile?.name || 'Administrator'}
               </h2>
-
               <p>
-                Manage university schools and monitor overall
-                academic activity from one place.
+                Manage university schools, academic years and monitor
+                overall academic activity from one place.
               </p>
             </div>
 
             <div className="admin-welcome-icon">
               <GraduationCap size={48} />
             </div>
-
           </section>
 
           {/* FEEDBACK */}
-
           {feedback && (
             <div className="admin-success">
               <span>{feedback}</span>
-
               <button
                 type="button"
                 onClick={() => setFeedback('')}
@@ -361,30 +359,19 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
           )}
 
           {/* ERROR */}
-
           {error && (
             <div className="admin-error">
-
               <AlertCircle size={19} />
-
               <span>{error}</span>
-
-              <button
-                type="button"
-                onClick={loadDashboard}
-              >
+              <button type="button" onClick={loadDashboard}>
                 Retry
               </button>
-
             </div>
           )}
 
           {/* UNIVERSITY STATISTICS */}
-
           <section className="admin-section">
-
             <div className="admin-section-heading">
-
               <div>
                 <h2>University Statistics</h2>
                 <p>
@@ -404,11 +391,9 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                 />
                 Refresh
               </button>
-
             </div>
 
             <div className="admin-stats-grid">
-
               {statCards.map((stat) => {
                 const Icon = stat.icon
 
@@ -417,10 +402,8 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                     className={`admin-stat-card ${stat.color}`}
                     key={stat.title}
                   >
-
                     <div className="admin-stat-top">
                       <span>{stat.title}</span>
-
                       <div className="admin-stat-icon">
                         <Icon size={21} />
                       </div>
@@ -435,27 +418,20 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                     <span className="admin-stat-caption">
                       University-wide count
                     </span>
-
                   </article>
                 )
               })}
-
             </div>
-
           </section>
 
           {/* SCHOOL MANAGEMENT */}
-
           <section
             className="admin-section"
             id="school-management"
           >
-
             <div className="admin-section-heading">
-
               <div>
                 <h2>School Management</h2>
-
                 <p>
                   View, register and manage university schools.
                 </p>
@@ -469,14 +445,11 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                 <Plus size={17} />
                 Add School
               </button>
-
             </div>
 
             <div className="admin-school-toolbar">
-
               <div className="admin-search-box">
                 <Search size={19} />
-
                 <input
                   type="search"
                   placeholder="Search by school name or code..."
@@ -488,10 +461,7 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
               <span className="admin-school-count">
                 {dashboard?.schools?.length ?? 0} Schools
               </span>
-
             </div>
-
-            {/* LOADING */}
 
             {loading && !dashboard && (
               <div className="admin-loading">
@@ -499,30 +469,23 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                   size={25}
                   className="admin-spinning"
                 />
-
                 <p>Loading university data...</p>
               </div>
             )}
 
-            {/* SCHOOL GRID */}
-
             {!loading && dashboard && (
               <div className="admin-school-grid">
-
                 {filteredSchools.map(school => (
                   <article
                     className="admin-school-card"
                     key={school.id}
                   >
-
                     <div className="admin-school-card-top">
-
                       <div className="admin-school-icon">
                         <School size={23} />
                       </div>
 
                       <div className="admin-school-card-actions">
-
                         <span
                           className={`admin-status ${
                             school.is_active ? 'active' : 'inactive'
@@ -531,10 +494,7 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                           {school.is_active ? 'Active' : 'Inactive'}
                         </span>
 
-                        {/* THREE-DOT MENU */}
-
                         <div className="admin-school-menu-wrapper">
-
                           <button
                             type="button"
                             className="admin-school-menu-button"
@@ -553,7 +513,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
 
                           {openMenuId === school.id && (
                             <div className="admin-school-dropdown">
-
                               <button
                                 type="button"
                                 onClick={() => handleEditSchool(school)}
@@ -573,35 +532,26 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                                 onClick={() => handleSchoolStatus(school)}
                               >
                                 <Power size={15} />
-
                                 {savingSchoolId === school.id
                                   ? 'Updating...'
                                   : school.is_active
                                     ? 'Deactivate School'
                                     : 'Activate School'}
                               </button>
-
                             </div>
                           )}
-
                         </div>
-
                       </div>
-
                     </div>
 
                     <div className="admin-school-info">
-
                       <span className="admin-school-code">
                         {school.code}
                       </span>
-
                       <h3>{school.name}</h3>
-
                     </div>
 
                     <div className="admin-school-stats">
-
                       <div>
                         <Users size={16} />
                         <strong>{school.student_count}</strong>
@@ -619,7 +569,6 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                         <strong>{school.elective_count}</strong>
                         <span>Electives</span>
                       </div>
-
                     </div>
 
                     <button
@@ -631,27 +580,28 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
                       Open Dashboard
                       <ArrowRight size={17} />
                     </button>
-
                   </article>
                 ))}
 
                 {filteredSchools.length === 0 && (
                   <div className="admin-empty-state">
-
                     <Search size={30} />
-
                     <h3>No schools found</h3>
-
                     <p>
                       Try searching with another name or school code.
                     </p>
-
                   </div>
                 )}
-
               </div>
             )}
+          </section>
 
+          {/* ACADEMIC YEAR MANAGEMENT */}
+          <section
+            className="admin-section"
+            id="academic-year-management"
+          >
+            <AcademicYearManagement />
           </section>
 
         </div>
@@ -660,11 +610,9 @@ function AdminDashboard({ profile, onLogout, onOpenSchool }) {
           SmartSelect · MIT ADT University
           <span>University Administration Portal</span>
         </footer>
-
       </section>
 
       {/* ADD / EDIT SCHOOL MODAL */}
-
       {modalOpen && (
         <SchoolFormModal
           mode={modalMode}

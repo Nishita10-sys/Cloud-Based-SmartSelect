@@ -210,3 +210,271 @@ export async function setSchoolStatus(schoolId, isActive) {
 
   return data
 }
+
+// ======================================================
+// ACADEMIC YEAR MANAGEMENT
+// ======================================================
+
+// Retrieve all academic years.
+export async function getAcademicYears() {
+  const { data, error } = await supabase
+    .from('academic_years')
+    .select('*')
+    .order('start_date', { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return data || []
+}
+
+// Create an academic year.
+export async function createAcademicYear({
+  name,
+  code,
+  startDate,
+  endDate,
+}) {
+  const { data, error } = await supabase
+    .from('academic_years')
+    .insert({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      start_date: startDate,
+      end_date: endDate,
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return data
+}
+
+// Update academic year details.
+export async function updateAcademicYear(
+  yearId,
+  { name, code, startDate, endDate }
+) {
+  const { data, error } = await supabase
+    .from('academic_years')
+    .update({
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      start_date: startDate,
+      end_date: endDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', yearId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Academic year not found.')
+
+  return data
+}
+
+// Activate or deactivate an academic year safely.
+export async function setAcademicYearStatus(yearId, isActive) {
+  const { error } = await supabase.rpc('set_academic_year_status', {
+    target_year_id: yearId,
+    target_is_active: isActive,
+  })
+
+  if (error) throw new Error(error.message)
+
+  const { data, error: fetchError } = await supabase
+    .from('academic_years')
+    .select('*')
+    .eq('id', yearId)
+    .single()
+
+  if (fetchError) throw new Error(fetchError.message)
+
+  return data
+}
+
+// Set one academic year as current safely.
+export async function setCurrentAcademicYear(yearId) {
+  const { error } = await supabase.rpc('set_current_academic_year', {
+    target_year_id: yearId,
+  })
+
+  if (error) throw new Error(error.message)
+
+  const { data, error: fetchError } = await supabase
+    .from('academic_years')
+    .select('*')
+    .eq('id', yearId)
+    .single()
+
+  if (fetchError) throw new Error(fetchError.message)
+
+  return data
+}
+
+
+// ======================================================
+// SEMESTER MANAGEMENT
+// ======================================================
+
+// Retrieve semesters belonging to one academic year.
+export async function getAcademicTerms(academicYearId) {
+  const { data, error } = await supabase
+    .from('academic_terms')
+    .select('*')
+    .eq('academic_year_id', academicYearId)
+    .order('semester_number', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  return data || []
+}
+
+// Validate that semester dates fall within the selected academic year.
+async function validateSemesterDates(
+  academicYearId,
+  semesterNumber,
+  startDate,
+  endDate,
+  excludeTermId = null
+) {
+  if (!Number.isInteger(semesterNumber) ||
+      semesterNumber < 1 ||
+      semesterNumber > 8) {
+    throw new Error('Semester number must be between 1 and 8.')
+  }
+
+  if (endDate <= startDate) {
+    throw new Error('Semester end date must be after its start date.')
+  }
+
+  const { data: year, error: yearError } = await supabase
+    .from('academic_years')
+    .select('id, start_date, end_date, is_active')
+    .eq('id', academicYearId)
+    .maybeSingle()
+
+  if (yearError) throw new Error(yearError.message)
+
+  if (!year) {
+    throw new Error('Academic year not found.')
+  }
+
+  if (startDate < year.start_date || endDate > year.end_date) {
+    throw new Error(
+      'Semester dates must fall within the selected academic year.'
+    )
+  }
+
+  let query = supabase
+    .from('academic_terms')
+    .select('id, semester_number')
+    .eq('academic_year_id', academicYearId)
+    .eq('semester_number', semesterNumber)
+
+  if (excludeTermId) {
+    query = query.neq('id', excludeTermId)
+  }
+
+  const { data: existingTerms, error: duplicateError } = await query
+
+  if (duplicateError) throw new Error(duplicateError.message)
+
+  if (existingTerms?.length) {
+    throw new Error(
+      `Semester ${semesterNumber} already exists for this academic year.`
+    )
+  }
+
+  return year
+}
+
+// Create a semester.
+export async function createAcademicTerm({
+  academicYearId,
+  semesterNumber,
+  name,
+  startDate,
+  endDate,
+}) {
+  await validateSemesterDates(
+    academicYearId,
+    semesterNumber,
+    startDate,
+    endDate
+  )
+
+  const { data, error } = await supabase
+    .from('academic_terms')
+    .insert({
+      academic_year_id: academicYearId,
+      semester_number: semesterNumber,
+      name: name.trim(),
+      start_date: startDate,
+      end_date: endDate,
+    })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return data
+}
+
+// Update semester details.
+export async function updateAcademicTerm(
+  termId,
+  {
+    academicYearId,
+    semesterNumber,
+    name,
+    startDate,
+    endDate,
+  }
+) {
+  await validateSemesterDates(
+    academicYearId,
+    semesterNumber,
+    startDate,
+    endDate,
+    termId
+  )
+
+  const { data, error } = await supabase
+    .from('academic_terms')
+    .update({
+      semester_number: semesterNumber,
+      name: name.trim(),
+      start_date: startDate,
+      end_date: endDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', termId)
+    .eq('academic_year_id', academicYearId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Semester not found.')
+
+  return data
+}
+
+// Activate or deactivate a semester.
+export async function setAcademicTermStatus(termId, isActive) {
+  const { data, error } = await supabase
+    .from('academic_terms')
+    .update({
+      is_active: isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', termId)
+    .select()
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  if (!data) throw new Error('Semester not found.')
+
+  return data
+}

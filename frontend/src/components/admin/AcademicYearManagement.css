@@ -1,0 +1,785 @@
+
+.academic-years-section {
+  margin: 30px 0;
+  color: #17243b;
+}
+
+.academic-years-heading,
+.academic-year-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.academic-years-eyebrow,
+.academic-year-modal-header span {
+  color: #17649a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+}
+
+.academic-years-heading h2 {
+  margin: 6px 0;
+  font-size: 23px;
+  font-weight: 700;
+}
+
+.academic-years-heading p,
+.academic-year-list-heading p {
+  margin: 0;
+  color: #718096;
+  font-size: 13px;
+}
+
+.academic-years-heading-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.academic-year-refresh-btn,
+.academic-year-add-btn,
+.academic-year-empty button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.academic-year-refresh-btn {
+  color: #36516b;
+  background: #fff;
+  border: 1px solid #dce5ef;
+}
+
+.academic-year-refresh-btn:hover {
+  background: #f2f7fc;
+}
+
+.academic-year-add-btn,
+.academic-year-empty button {
+  color: #fff;
+  background: #17649a;
+  border: 1px solid #17649a;
+}
+
+.academic-year-add-btn:hover,
+.academic-year-empty button:hover {
+  background: #124e79;
+}
+
+.academic-year-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.academic-year-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.academic-year-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+}
+
+.academic-year-summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 43px;
+  height: 43px;
+  color: #17649a;
+  background: #eaf3fa;
+  border-radius: 10px;
+}
+
+.academic-year-summary-icon.active {
+  color: #16835d;
+  background: #e9f7f0;
+}
+
+.academic-year-summary-icon.current {
+  color: #9a6b16;
+  background: #fff5df;
+}
+
+.academic-year-summary-card span {
+  display: block;
+  margin-bottom: 5px;
+  color: #718096;
+  font-size: 12px;
+}
+
+.academic-year-summary-card strong {
+  display: block;
+  color: #17243b;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.academic-year-list-card {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+}
+
+.academic-year-list-heading {
+  padding: 20px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.academic-year-list-heading h3 {
+  margin: 0 0 5px;
+  font-size: 16px;
+}
+
+.academic-year-count {
+  padding: 6px 10px;
+  color: #17649a;
+  background: #eaf3fa;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.academic-year-table-wrap {
+  overflow-x: auto;
+}
+
+.academic-year-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.academic-year-table th {
+  padding: 14px 18px;
+  color: #718096;
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.academic-year-table td {
+  padding: 16px 18px;
+  color: #526176;
+  border-top: 1px solid #edf0f5;
+  font-size: 13px;
+}
+
+.academic-year-table tbody tr:hover {
+  background: #fbfdff;
+}
+
+.academic-year-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #17243b;
+}
+
+.academic-year-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #17649a;
+  background: #eaf3fa;
+  border-radius: 8px;
+}
+
+.academic-year-statuses {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.academic-year-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.academic-year-status.current {
+  color: #98640b;
+  background: #fff3d8;
+}
+
+.academic-year-status.active {
+  color: #16835d;
+  background: #e9f7f0;
+}
+
+.academic-year-status.inactive {
+  color: #718096;
+  background: #eef1f5;
+}
+
+.academic-year-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.academic-year-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border: 1px solid #e1e7ef;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.academic-year-action-btn.edit {
+  color: #17649a;
+}
+
+.academic-year-action-btn.edit:hover {
+  background: #eaf3fa;
+}
+
+.academic-year-action-btn.make-current {
+  color: #16835d;
+}
+
+.academic-year-action-btn.make-current:hover {
+  background: #e9f7f0;
+}
+
+.academic-year-action-btn.activate {
+  color: #16835d;
+}
+
+.academic-year-action-btn.deactivate {
+  color: #c04c4c;
+}
+
+.academic-year-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.academic-year-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 210px;
+  padding: 25px;
+  color: #8795a8;
+  text-align: center;
+}
+
+.academic-year-empty strong {
+  color: #34445a;
+  font-size: 14px;
+}
+
+.academic-year-empty span {
+  font-size: 12px;
+}
+
+.academic-year-empty button {
+  margin-top: 5px;
+}
+
+.academic-year-loading-icon {
+  animation: academic-year-spin 1s linear infinite;
+}
+
+@keyframes academic-year-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.academic-year-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 15px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.academic-year-alert.error {
+  color: #a93636;
+  background: #fff0f0;
+  border: 1px solid #f4d1d1;
+}
+
+.academic-year-alert.success {
+  color: #16734f;
+  background: #edfaf3;
+  border: 1px solid #ccebd9;
+}
+
+.academic-year-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 35, 55, 0.48);
+}
+
+.academic-year-modal {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 18px 55px rgba(20, 35, 55, 0.2);
+}
+
+.academic-year-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 23px;
+}
+
+.academic-year-modal-header h3 {
+  margin: 6px 0 0;
+  color: #17243b;
+  font-size: 20px;
+}
+
+.academic-year-modal-header > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #718096;
+  background: #f3f6f9;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.academic-year-form-group {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 17px;
+}
+
+.academic-year-form-group label {
+  color: #34445a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.academic-year-form-group input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: #17243b;
+  background: #fff;
+  border: 1px solid #dce4ed;
+  border-radius: 7px;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.academic-year-form-group input:focus {
+  border-color: #17649a;
+  box-shadow: 0 0 0 3px rgba(23, 100, 154, 0.1);
+}
+
+.academic-year-form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.academic-year-form-note {
+  margin: 0 0 20px;
+  padding: 11px;
+  color: #63758b;
+  background: #f4f8fc;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.academic-year-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 17px;
+  border-top: 1px solid #edf0f5;
+}
+
+.academic-year-cancel-btn,
+.academic-year-save-btn {
+  padding: 10px 16px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.academic-year-cancel-btn {
+  color: #526176;
+  background: #fff;
+  border: 1px solid #dce4ed;
+}
+
+.academic-year-save-btn {
+  color: #fff;
+  background: #17649a;
+  border: 1px solid #17649a;
+}
+
+.academic-year-save-btn:disabled,
+.academic-year-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 850px) {
+  .academic-year-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .academic-years-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .academic-years-heading-actions {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .academic-year-form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .academic-year-modal {
+    padding: 18px;
+  }
+
+  .academic-year-list-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+
+/* ======================================================
+   SEMESTER MANAGEMENT
+====================================================== */
+
+.semester-management-card {
+  margin-top: 24px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+}
+
+.semester-management-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.semester-management-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.semester-management-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: #17649a;
+  background: #eaf4fc;
+  border-radius: 10px;
+}
+
+.semester-year-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.semester-year-selector label {
+  color: #526174;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.semester-year-selector select,
+.academic-year-form-group select {
+  min-height: 42px;
+  padding: 9px 12px;
+  color: #26374a;
+  background: #fff;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+  outline: none;
+}
+
+.semester-year-selector select:focus,
+.academic-year-form-group select:focus {
+  border-color: #3184bd;
+  box-shadow: 0 0 0 3px rgba(49, 132, 189, 0.12);
+}
+
+.semester-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.semester-card {
+  min-width: 0;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e3eaf1;
+  border-radius: 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.semester-card:hover {
+  border-color: #a9cce5;
+  box-shadow: 0 5px 16px rgba(30, 75, 110, 0.07);
+}
+
+.semester-card-empty {
+  background: #f9fbfd;
+  border-style: dashed;
+}
+
+.semester-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.semester-number {
+  color: #1c4567;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.semester-status {
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.semester-status.pending {
+  color: #8a650e;
+  background: #fff5d9;
+}
+
+.semester-status.active {
+  color: #14734f;
+  background: #e5f6ee;
+}
+
+.semester-status.inactive {
+  color: #687587;
+  background: #edf0f4;
+}
+
+.semester-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 76px;
+}
+
+.semester-card-content h4 {
+  margin: 0;
+  color: #26374a;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.semester-date-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.semester-date-row strong {
+  color: #34475c;
+  font-weight: 600;
+}
+
+.semester-card-description {
+  margin: 0;
+  color: #8491a1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.semester-add-btn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 14px;
+  color: #17649a;
+  background: #edf6fc;
+  border: 1px solid #cfe4f4;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.semester-add-btn:hover {
+  background: #dceefa;
+}
+
+.semester-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.semester-edit-btn,
+.semester-status-btn {
+  flex: 1;
+  min-height: 36px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.semester-edit-btn {
+  color: #17649a;
+  background: #edf6fc;
+  border: 1px solid #d2e6f5;
+}
+
+.semester-status-btn {
+  color: #64748b;
+  background: #f4f6f8;
+  border: 1px solid #e2e7ed;
+}
+
+.semester-status-btn.deactivate {
+  color: #a34b43;
+  background: #fff1ef;
+  border-color: #f5d8d4;
+}
+
+.semester-edit-btn:hover,
+.semester-status-btn:hover {
+  filter: brightness(0.97);
+}
+
+.semester-information-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 20px;
+  padding: 13px 15px;
+  color: #536b80;
+  background: #f0f7fc;
+  border: 1px solid #dcecf7;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.semester-information-note p {
+  margin: 0;
+}
+
+/* Responsive layout */
+@media (max-width: 1100px) {
+  .semester-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .semester-management-card {
+    padding: 16px;
+  }
+
+  .semester-management-heading {
+    align-items: flex-start;
+  }
+
+  .semester-year-selector {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .semester-year-selector select {
+    width: 100%;
+  }
+
+  .semester-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .semester-card-actions {
+    flex-direction: column;
+  }
+}
+

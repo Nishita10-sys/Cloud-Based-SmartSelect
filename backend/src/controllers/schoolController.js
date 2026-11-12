@@ -7,6 +7,7 @@ import {
   createDepartment,
   updateDepartment,
   setDepartmentStatus,
+  getSchoolStudents,
 } from '../services/schoolService.js'
 
 const schoolIdSchema = z.string().uuid()
@@ -21,7 +22,10 @@ const statusSchema = z.object({
   is_active: z.boolean(),
 })
 
+// ======================================================
 // GET SCHOOL DASHBOARD
+// ======================================================
+
 export async function getSchoolDashboardData(req, res) {
   const validation = schoolIdSchema.safeParse(req.params.schoolId)
 
@@ -57,7 +61,10 @@ export async function getSchoolDashboardData(req, res) {
   }
 }
 
+// ======================================================
 // GET DEPARTMENTS
+// ======================================================
+
 export async function getDepartments(req, res) {
   const validation = schoolIdSchema.safeParse(req.params.schoolId)
 
@@ -85,7 +92,10 @@ export async function getDepartments(req, res) {
   }
 }
 
+// ======================================================
 // CREATE DEPARTMENT
+// ======================================================
+
 export async function createDepartmentData(req, res) {
   const schoolValidation = schoolIdSchema.safeParse(req.params.schoolId)
   const bodyValidation = departmentSchema.safeParse(req.body)
@@ -119,7 +129,10 @@ export async function createDepartmentData(req, res) {
   }
 }
 
+// ======================================================
 // UPDATE DEPARTMENT
+// ======================================================
+
 export async function updateDepartmentData(req, res) {
   const schoolValidation = schoolIdSchema.safeParse(req.params.schoolId)
   const departmentValidation = departmentIdSchema.safeParse(req.params.departmentId)
@@ -165,7 +178,10 @@ export async function updateDepartmentData(req, res) {
   }
 }
 
+// ======================================================
 // ACTIVATE / DEACTIVATE DEPARTMENT
+// ======================================================
+
 export async function updateDepartmentStatus(req, res) {
   const schoolValidation = schoolIdSchema.safeParse(req.params.schoolId)
   const departmentValidation = departmentIdSchema.safeParse(req.params.departmentId)
@@ -207,6 +223,39 @@ export async function updateDepartmentStatus(req, res) {
     return res.status(500).json({
       success: false,
       message: 'Unable to update department status.',
+    })
+  }
+}
+
+// ======================================================
+// GET SCHOOL STUDENTS
+// ======================================================
+
+export async function getSchoolStudentsData(req, res) {
+  const validation = schoolIdSchema.safeParse(req.params.schoolId)
+
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide a valid school ID.',
+    })
+  }
+
+  try {
+    const students = await getSchoolStudents(validation.data)
+
+    return res.status(200).json({
+      success: true,
+      message: 'School students retrieved successfully.',
+      data: students,
+      total: students.length,
+    })
+  } catch (error) {
+    console.error('Get school students error:', error.message)
+
+    return res.status(500).json({
+      success: false,
+      message: 'Unable to retrieve school students.',
     })
   }
 }

@@ -10,6 +10,7 @@ import {
   createDepartmentData,
   updateDepartmentData,
   updateDepartmentStatus,
+  getSchoolStudentsData,
 } from '../controllers/schoolController.js'
 
 const router = Router()
@@ -29,5 +30,8 @@ router.patch(
   '/:schoolId/departments/:departmentId/status',
   updateDepartmentStatus
 )
+
+// Student management.
+router.get('/:schoolId/students', getSchoolStudentsData)
 
 export default router

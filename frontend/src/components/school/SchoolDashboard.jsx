@@ -29,6 +29,13 @@ import './SchoolDashboard.css'
 function SchoolDashboard({ school, onBack }) {
   const [dashboard, setDashboard] = useState(null)
   const [departments, setDepartments] = useState([])
+
+  // Student directory states.
+  const [students, setStudents] = useState([])
+  const [isStudentsLoading, setIsStudentsLoading] = useState(false)
+  const [studentError, setStudentError] = useState('')
+  const [studentSearchTerm, setStudentSearchTerm] = useState('')
+
   const [currentView, setCurrentView] = useState('overview')
 
   const [isLoading, setIsLoading] = useState(true)
@@ -104,6 +111,32 @@ function SchoolDashboard({ school, onBack }) {
     }
   }
 
+  // Load students for the selected school.
+  const fetchStudents = async () => {
+    if (!school?.id) return
+
+    setIsStudentsLoading(true)
+    setStudentError('')
+
+    try {
+      const result = await schoolService.getStudents(school.id)
+
+      if (!result.success) {
+        throw new Error(result.message || 'Unable to load students.')
+      }
+
+      setStudents(result.data || [])
+    } catch (err) {
+      setStudentError(
+        err.response?.data?.message ||
+        err.message ||
+        'Unable to retrieve students.'
+      )
+    } finally {
+      setIsStudentsLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchDashboard()
   }, [school?.id])
@@ -111,6 +144,12 @@ function SchoolDashboard({ school, onBack }) {
   useEffect(() => {
     if (currentView === 'departments') {
       fetchDepartments()
+    }
+  }, [currentView, school?.id])
+
+  useEffect(() => {
+    if (currentView === 'students') {
+      fetchStudents()
     }
   }, [currentView, school?.id])
 
@@ -250,7 +289,7 @@ function SchoolDashboard({ school, onBack }) {
 
   const navigation = [
     { label: 'Overview', icon: LayoutDashboard, view: 'overview' },
-    { label: 'Students', icon: Users },
+    { label: 'Students', icon: Users, view: 'students' },
     { label: 'Faculty', icon: UserRound },
     { label: 'Departments', icon: Building2, view: 'departments' },
     { label: 'Electives', icon: BookOpen },
@@ -258,12 +297,26 @@ function SchoolDashboard({ school, onBack }) {
     { label: 'Settings', icon: Settings },
   ]
 
+  // Search departments.
   const filteredDepartments = departments.filter((department) => {
     const search = searchTerm.toLowerCase()
 
     return (
-      department.name.toLowerCase().includes(search) ||
-      department.code.toLowerCase().includes(search)
+      (department.name || '').toLowerCase().includes(search) ||
+      (department.code || '').toLowerCase().includes(search)
+    )
+  })
+
+  // Search students.
+  const filteredStudents = students.filter((student) => {
+    const search = studentSearchTerm.toLowerCase()
+
+    return (
+      (student.full_name || '').toLowerCase().includes(search) ||
+      (student.enrollment_number || '').toLowerCase().includes(search) ||
+      (student.email || '').toLowerCase().includes(search) ||
+      (student.department?.name || '').toLowerCase().includes(search) ||
+      (student.specialization?.name || '').toLowerCase().includes(search)
     )
   })
 
@@ -303,6 +356,7 @@ function SchoolDashboard({ school, onBack }) {
                     setCurrentView(item.view)
                     setSuccessMessage('')
                     setDepartmentError('')
+                    setStudentError('')
                   }
                 }}
                 disabled={!item.view}
@@ -340,8 +394,13 @@ function SchoolDashboard({ school, onBack }) {
             </button>
 
             <span className="school-breadcrumb-divider">/</span>
+
             <span>
-              {currentView === 'overview' ? 'School Overview' : 'Departments'}
+              {currentView === 'overview'
+                ? 'School Overview'
+                : currentView === 'departments'
+                  ? 'Departments'
+                  : 'Students'}
             </span>
           </div>
 
@@ -419,6 +478,7 @@ function SchoolDashboard({ school, onBack }) {
             </section>
           ) : (
             <>
+              {/* SCHOOL OVERVIEW */}
               {currentView === 'overview' && (
                 <>
                   <section className="school-section-heading">
@@ -516,6 +576,163 @@ function SchoolDashboard({ school, onBack }) {
                 </>
               )}
 
+              {/* STUDENTS DIRECTORY */}
+              {currentView === 'students' && (
+                <>
+                  <section className="school-section-heading school-department-page-heading">
+                    <div>
+                      <h2>Student Directory</h2>
+                      <p>
+                        View students assigned to{' '}
+                        {dashboard?.school?.name || school?.name}.
+                      </p>
+                    </div>
+
+                    <span className="school-live-label">
+                      <span />
+                      {students.length} students registered
+                    </span>
+                  </section>
+
+                  {studentError && students.length > 0 && (
+                    <div className="school-error-message">
+                      <AlertCircle size={17} />
+                      {studentError}
+                    </div>
+                  )}
+
+                  <section className="school-departments-card school-management-card">
+                    <div className="school-department-toolbar">
+                      <div>
+                        <h3>All Students</h3>
+                        <p>
+                          {students.length} active student records
+                        </p>
+                      </div>
+
+                      <div className="school-search-box">
+                        <Search size={17} />
+                        <input
+                          type="text"
+                          placeholder="Search name, enrollment, email..."
+                          value={studentSearchTerm}
+                          onChange={(event) =>
+                            setStudentSearchTerm(event.target.value)
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {isStudentsLoading ? (
+                      <div className="school-state-card">
+                        <RefreshCw
+                          className="school-loading-icon"
+                          size={26}
+                        />
+                        <h3>Loading students</h3>
+                        <p>Please wait...</p>
+                      </div>
+                    ) : studentError && students.length === 0 ? (
+                      <div className="school-empty-state">
+                        <AlertCircle size={30} />
+                        <strong>Unable to load students</strong>
+                        <span>{studentError}</span>
+
+                        <button
+                          type="button"
+                          className="school-retry-button"
+                          onClick={fetchStudents}
+                        >
+                          <RefreshCw size={15} />
+                          Try Again
+                        </button>
+                      </div>
+                    ) : filteredStudents.length > 0 ? (
+                      <div className="school-table-wrapper">
+                        <table className="school-table">
+                          <thead>
+                            <tr>
+                              <th>Student</th>
+                              <th>Enrollment Number</th>
+                              <th>Department</th>
+                              <th>Specialization</th>
+                              <th>Year / Division</th>
+                              <th>Email</th>
+                              <th>Account Status</th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {filteredStudents.map((student) => (
+                              <tr key={student.student_id}>
+                                <td>
+                                  <div className="school-department-name">
+                                    <div>
+                                      <Users size={18} />
+                                    </div>
+                                    <strong>
+                                      {student.full_name || 'Unnamed Student'}
+                                    </strong>
+                                  </div>
+                                </td>
+
+                                <td>{student.enrollment_number || '—'}</td>
+
+                                <td>
+                                  {student.department?.name || '—'}
+                                </td>
+
+                                <td>
+                                  {student.specialization?.name || '—'}
+                                </td>
+
+                                <td>
+                                  {student.academic_year_level || '—'}
+                                  {student.division
+                                    ? ` / ${student.division}`
+                                    : ''}
+                                </td>
+
+                                <td>{student.email || '—'}</td>
+
+                                <td>
+                                  <span
+                                    className={`school-department-status ${
+                                      student.account_status === 'active'
+                                        ? 'active'
+                                        : 'inactive'
+                                    }`}
+                                  >
+                                    {student.account_status || 'Unknown'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="school-empty-state">
+                        <Users size={32} />
+
+                        <strong>
+                          {studentSearchTerm
+                            ? 'No matching students'
+                            : 'No students assigned yet'}
+                        </strong>
+
+                        <span>
+                          {studentSearchTerm
+                            ? 'Try a different name, enrollment number or email.'
+                            : 'Students will appear here after their academic records are assigned to this school.'}
+                        </span>
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+
+              {/* DEPARTMENT MANAGEMENT */}
               {currentView === 'departments' && (
                 <>
                   <section className="school-section-heading school-department-page-heading">
@@ -555,7 +772,9 @@ function SchoolDashboard({ school, onBack }) {
                     <div className="school-department-toolbar">
                       <div>
                         <h3>All Departments</h3>
-                        <p>{departments.length} departments registered</p>
+                        <p>
+                          {departments.length} departments registered
+                        </p>
                       </div>
 
                       <div className="school-search-box">
@@ -564,14 +783,19 @@ function SchoolDashboard({ school, onBack }) {
                           type="text"
                           placeholder="Search departments..."
                           value={searchTerm}
-                          onChange={(event) => setSearchTerm(event.target.value)}
+                          onChange={(event) =>
+                            setSearchTerm(event.target.value)
+                          }
                         />
                       </div>
                     </div>
 
                     {isDepartmentsLoading ? (
                       <div className="school-state-card">
-                        <RefreshCw className="school-loading-icon" size={26} />
+                        <RefreshCw
+                          className="school-loading-icon"
+                          size={26}
+                        />
                         <h3>Loading departments</h3>
                         <p>Please wait...</p>
                       </div>
@@ -579,6 +803,7 @@ function SchoolDashboard({ school, onBack }) {
                       <div className="school-empty-state">
                         <AlertCircle size={30} />
                         <strong>Unable to load departments</strong>
+
                         <button
                           type="button"
                           className="school-retry-button"
@@ -605,7 +830,9 @@ function SchoolDashboard({ school, onBack }) {
                               <tr key={department.id}>
                                 <td>
                                   <div className="school-department-name">
-                                    <div><Building2 size={18} /></div>
+                                    <div>
+                                      <Building2 size={18} />
+                                    </div>
                                     <strong>{department.name}</strong>
                                   </div>
                                 </td>
@@ -625,7 +852,9 @@ function SchoolDashboard({ school, onBack }) {
                                     <button
                                       type="button"
                                       title="Edit department"
-                                      onClick={() => handleEditDepartment(department)}
+                                      onClick={() =>
+                                        handleEditDepartment(department)
+                                      }
                                     >
                                       <Pencil size={16} />
                                       Edit
@@ -633,12 +862,24 @@ function SchoolDashboard({ school, onBack }) {
 
                                     <button
                                       type="button"
-                                      className={department.is_active ? 'deactivate' : 'activate'}
-                                      title={department.is_active ? 'Deactivate department' : 'Activate department'}
-                                      onClick={() => handleToggleStatus(department)}
+                                      className={
+                                        department.is_active
+                                          ? 'deactivate'
+                                          : 'activate'
+                                      }
+                                      title={
+                                        department.is_active
+                                          ? 'Deactivate department'
+                                          : 'Activate department'
+                                      }
+                                      onClick={() =>
+                                        handleToggleStatus(department)
+                                      }
                                     >
                                       <Power size={16} />
-                                      {department.is_active ? 'Deactivate' : 'Activate'}
+                                      {department.is_active
+                                        ? 'Deactivate'
+                                        : 'Activate'}
                                     </button>
                                   </div>
                                 </td>
@@ -650,9 +891,13 @@ function SchoolDashboard({ school, onBack }) {
                     ) : (
                       <div className="school-empty-state">
                         <ClipboardList size={32} />
+
                         <strong>
-                          {searchTerm ? 'No matching departments' : 'No departments added yet'}
+                          {searchTerm
+                            ? 'No matching departments'
+                            : 'No departments added yet'}
                         </strong>
+
                         <span>
                           {searchTerm
                             ? 'Try a different department name or code.'
@@ -673,6 +918,7 @@ function SchoolDashboard({ school, onBack }) {
         </div>
       </main>
 
+      {/* ADD / EDIT DEPARTMENT MODAL */}
       {showModal && (
         <div
           className="school-modal-overlay"
@@ -726,10 +972,12 @@ function SchoolDashboard({ school, onBack }) {
                 type="text"
                 placeholder="e.g. Computer Science and Engineering"
                 value={formData.name}
-                onChange={(event) => setFormData({
-                  ...formData,
-                  name: event.target.value,
-                })}
+                onChange={(event) =>
+                  setFormData({
+                    ...formData,
+                    name: event.target.value,
+                  })
+                }
                 maxLength={100}
                 required
               />
@@ -740,10 +988,12 @@ function SchoolDashboard({ school, onBack }) {
                 type="text"
                 placeholder="e.g. CSE"
                 value={formData.code}
-                onChange={(event) => setFormData({
-                  ...formData,
-                  code: event.target.value.toUpperCase(),
-                })}
+                onChange={(event) =>
+                  setFormData({
+                    ...formData,
+                    code: event.target.value.toUpperCase(),
+                  })
+                }
                 maxLength={20}
                 required
               />
@@ -764,11 +1014,19 @@ function SchoolDashboard({ school, onBack }) {
                   disabled={isSaving}
                 >
                   {isSaving ? (
-                    <RefreshCw size={16} className="school-loading-icon" />
+                    <RefreshCw
+                      size={16}
+                      className="school-loading-icon"
+                    />
                   ) : (
                     <Save size={16} />
                   )}
-                  {isSaving ? 'Saving...' : editingDepartment ? 'Save Changes' : 'Create Department'}
+
+                  {isSaving
+                    ? 'Saving...'
+                    : editingDepartment
+                      ? 'Save Changes'
+                      : 'Create Department'}
                 </button>
               </div>
             </form>

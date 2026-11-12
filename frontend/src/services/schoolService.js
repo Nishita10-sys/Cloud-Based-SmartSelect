@@ -1,8 +1,15 @@
 
 import api from './api'
 
+// ======================================================
+// SCHOOL SERVICE
+// ======================================================
+
 const schoolService = {
-  // Get school dashboard.
+  // ====================================================
+  // SCHOOL DASHBOARD
+  // ====================================================
+
   async getDashboard(schoolId) {
     const response = await api.get(
       `/schools/${schoolId}/dashboard`
@@ -11,7 +18,11 @@ const schoolService = {
     return response.data
   },
 
-  // Get departments for a selected school.
+  // ====================================================
+  // DEPARTMENTS
+  // ====================================================
+
+  // Retrieve all departments belonging to one school.
   async getDepartments(schoolId) {
     const response = await api.get(
       `/schools/${schoolId}/departments`
@@ -30,7 +41,7 @@ const schoolService = {
     return response.data
   },
 
-  // Update department details.
+  // Update a department.
   async updateDepartment(schoolId, departmentId, departmentData) {
     const response = await api.put(
       `/schools/${schoolId}/departments/${departmentId}`,
@@ -44,7 +55,22 @@ const schoolService = {
   async updateDepartmentStatus(schoolId, departmentId, isActive) {
     const response = await api.patch(
       `/schools/${schoolId}/departments/${departmentId}/status`,
-      { is_active: isActive }
+      {
+        is_active: isActive,
+      }
+    )
+
+    return response.data
+  },
+
+  // ====================================================
+  // STUDENTS
+  // ====================================================
+
+  // Retrieve students belonging to one school.
+  async getStudents(schoolId) {
+    const response = await api.get(
+      `/schools/${schoolId}/students`
     )
 
     return response.data
