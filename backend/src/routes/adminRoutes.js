@@ -21,6 +21,14 @@ import {
   changeAcademicTermStatus,
 } from '../controllers/adminController.js'
 
+import {
+  getStudents,
+  getStudentDetails,
+  getStudentOptions,
+  addStudent,
+  changeStudentAccountStatus,
+} from '../controllers/studentManagementController.js'
+
 const router = Router()
 
 // All admin routes require authentication and admin authorization.
@@ -75,5 +83,13 @@ router.patch(
   '/semesters/:termId/status',
   changeAcademicTermStatus
 )
+
+
+// Student Management
+router.get('/students', getStudents)
+router.get('/students/options', getStudentOptions)
+router.get('/students/:studentId', getStudentDetails)
+router.post('/students', addStudent)
+router.patch('/students/:studentId/status', changeStudentAccountStatus)
 
 export default router

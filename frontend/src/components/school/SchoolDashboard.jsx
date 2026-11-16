@@ -24,17 +24,12 @@ import {
 } from 'lucide-react'
 
 import schoolService from '../../services/schoolService'
+import StudentManagement from '../admin/StudentManagement'
 import './SchoolDashboard.css'
 
 function SchoolDashboard({ school, onBack }) {
   const [dashboard, setDashboard] = useState(null)
   const [departments, setDepartments] = useState([])
-
-  // Student directory states.
-  const [students, setStudents] = useState([])
-  const [isStudentsLoading, setIsStudentsLoading] = useState(false)
-  const [studentError, setStudentError] = useState('')
-  const [studentSearchTerm, setStudentSearchTerm] = useState('')
 
   const [currentView, setCurrentView] = useState('overview')
 
@@ -111,32 +106,6 @@ function SchoolDashboard({ school, onBack }) {
     }
   }
 
-  // Load students for the selected school.
-  const fetchStudents = async () => {
-    if (!school?.id) return
-
-    setIsStudentsLoading(true)
-    setStudentError('')
-
-    try {
-      const result = await schoolService.getStudents(school.id)
-
-      if (!result.success) {
-        throw new Error(result.message || 'Unable to load students.')
-      }
-
-      setStudents(result.data || [])
-    } catch (err) {
-      setStudentError(
-        err.response?.data?.message ||
-        err.message ||
-        'Unable to retrieve students.'
-      )
-    } finally {
-      setIsStudentsLoading(false)
-    }
-  }
-
   useEffect(() => {
     fetchDashboard()
   }, [school?.id])
@@ -144,12 +113,6 @@ function SchoolDashboard({ school, onBack }) {
   useEffect(() => {
     if (currentView === 'departments') {
       fetchDepartments()
-    }
-  }, [currentView, school?.id])
-
-  useEffect(() => {
-    if (currentView === 'students') {
-      fetchStudents()
     }
   }, [currentView, school?.id])
 
@@ -307,19 +270,6 @@ function SchoolDashboard({ school, onBack }) {
     )
   })
 
-  // Search students.
-  const filteredStudents = students.filter((student) => {
-    const search = studentSearchTerm.toLowerCase()
-
-    return (
-      (student.full_name || '').toLowerCase().includes(search) ||
-      (student.enrollment_number || '').toLowerCase().includes(search) ||
-      (student.email || '').toLowerCase().includes(search) ||
-      (student.department?.name || '').toLowerCase().includes(search) ||
-      (student.specialization?.name || '').toLowerCase().includes(search)
-    )
-  })
-
   return (
     <div className="school-dashboard">
 
@@ -356,7 +306,6 @@ function SchoolDashboard({ school, onBack }) {
                     setCurrentView(item.view)
                     setSuccessMessage('')
                     setDepartmentError('')
-                    setStudentError('')
                   }
                 }}
                 disabled={!item.view}
@@ -400,7 +349,9 @@ function SchoolDashboard({ school, onBack }) {
                 ? 'School Overview'
                 : currentView === 'departments'
                   ? 'Departments'
-                  : 'Students'}
+                  : currentView === 'students'
+                    ? 'Students'
+                    : currentView}
             </span>
           </div>
 
@@ -576,160 +527,9 @@ function SchoolDashboard({ school, onBack }) {
                 </>
               )}
 
-              {/* STUDENTS DIRECTORY */}
+              {/* SCHOOL-SPECIFIC STUDENT MANAGEMENT */}
               {currentView === 'students' && (
-                <>
-                  <section className="school-section-heading school-department-page-heading">
-                    <div>
-                      <h2>Student Directory</h2>
-                      <p>
-                        View students assigned to{' '}
-                        {dashboard?.school?.name || school?.name}.
-                      </p>
-                    </div>
-
-                    <span className="school-live-label">
-                      <span />
-                      {students.length} students registered
-                    </span>
-                  </section>
-
-                  {studentError && students.length > 0 && (
-                    <div className="school-error-message">
-                      <AlertCircle size={17} />
-                      {studentError}
-                    </div>
-                  )}
-
-                  <section className="school-departments-card school-management-card">
-                    <div className="school-department-toolbar">
-                      <div>
-                        <h3>All Students</h3>
-                        <p>
-                          {students.length} active student records
-                        </p>
-                      </div>
-
-                      <div className="school-search-box">
-                        <Search size={17} />
-                        <input
-                          type="text"
-                          placeholder="Search name, enrollment, email..."
-                          value={studentSearchTerm}
-                          onChange={(event) =>
-                            setStudentSearchTerm(event.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    {isStudentsLoading ? (
-                      <div className="school-state-card">
-                        <RefreshCw
-                          className="school-loading-icon"
-                          size={26}
-                        />
-                        <h3>Loading students</h3>
-                        <p>Please wait...</p>
-                      </div>
-                    ) : studentError && students.length === 0 ? (
-                      <div className="school-empty-state">
-                        <AlertCircle size={30} />
-                        <strong>Unable to load students</strong>
-                        <span>{studentError}</span>
-
-                        <button
-                          type="button"
-                          className="school-retry-button"
-                          onClick={fetchStudents}
-                        >
-                          <RefreshCw size={15} />
-                          Try Again
-                        </button>
-                      </div>
-                    ) : filteredStudents.length > 0 ? (
-                      <div className="school-table-wrapper">
-                        <table className="school-table">
-                          <thead>
-                            <tr>
-                              <th>Student</th>
-                              <th>Enrollment Number</th>
-                              <th>Department</th>
-                              <th>Specialization</th>
-                              <th>Year / Division</th>
-                              <th>Email</th>
-                              <th>Account Status</th>
-                            </tr>
-                          </thead>
-
-                          <tbody>
-                            {filteredStudents.map((student) => (
-                              <tr key={student.student_id}>
-                                <td>
-                                  <div className="school-department-name">
-                                    <div>
-                                      <Users size={18} />
-                                    </div>
-                                    <strong>
-                                      {student.full_name || 'Unnamed Student'}
-                                    </strong>
-                                  </div>
-                                </td>
-
-                                <td>{student.enrollment_number || '—'}</td>
-
-                                <td>
-                                  {student.department?.name || '—'}
-                                </td>
-
-                                <td>
-                                  {student.specialization?.name || '—'}
-                                </td>
-
-                                <td>
-                                  {student.academic_year_level || '—'}
-                                  {student.division
-                                    ? ` / ${student.division}`
-                                    : ''}
-                                </td>
-
-                                <td>{student.email || '—'}</td>
-
-                                <td>
-                                  <span
-                                    className={`school-department-status ${
-                                      student.account_status === 'active'
-                                        ? 'active'
-                                        : 'inactive'
-                                    }`}
-                                  >
-                                    {student.account_status || 'Unknown'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="school-empty-state">
-                        <Users size={32} />
-
-                        <strong>
-                          {studentSearchTerm
-                            ? 'No matching students'
-                            : 'No students assigned yet'}
-                        </strong>
-
-                        <span>
-                          {studentSearchTerm
-                            ? 'Try a different name, enrollment number or email.'
-                            : 'Students will appear here after their academic records are assigned to this school.'}
-                        </span>
-                      </div>
-                    )}
-                  </section>
-                </>
+                <StudentManagement schoolId={school.id} />
               )}
 
               {/* DEPARTMENT MANAGEMENT */}
@@ -1047,3 +847,4 @@ function ShieldIcon() {
 }
 
 export default SchoolDashboard
+

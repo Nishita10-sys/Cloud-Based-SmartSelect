@@ -1,5 +1,6 @@
 
 import './AdminDashboard.css'
+import StudentManagement from './StudentManagement'
 import { useEffect, useMemo, useState } from 'react'
 import {
   GraduationCap,

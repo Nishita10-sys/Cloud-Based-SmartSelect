@@ -115,6 +115,37 @@ const adminService = {
     )
     return response.data
   },
+
+
+// Student Management
+async getStudents(params = {}) {
+  const response = await api.get('/admin/students', { params })
+  return response.data
+},
+
+async getStudentDetails(studentId) {
+  const response = await api.get(`/admin/students/${studentId}`)
+  return response.data
+},
+
+async getStudentOptions() {
+  const response = await api.get('/admin/students/options')
+  return response.data
+},
+
+async createStudent(studentData) {
+  const response = await api.post('/admin/students', studentData)
+  return response.data
+},
+
+async updateStudentStatus(studentId, accountStatus) {
+  const response = await api.patch(
+    `/admin/students/${studentId}/status`,
+    { accountStatus }
+  )
+  return response.data
+},
+
 }
 
 export default adminService

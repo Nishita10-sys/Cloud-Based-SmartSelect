@@ -49,6 +49,30 @@ function createMap(rows) {
 }
 
 // ======================================================
+// SCHOOL VALIDATION
+// ======================================================
+
+async function validateSchool(schoolId) {
+  if (!schoolId) {
+    throw new Error('School selection is required.')
+  }
+
+  const { data: school, error } = await supabase
+    .from('schools')
+    .select('id, name, code, is_active')
+    .eq('id', schoolId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+
+  if (!school || !school.is_active) {
+    throw new Error('Selected school does not exist or is inactive.')
+  }
+
+  return school
+}
+
+// ======================================================
 // ACADEMIC RECORD ENRICHMENT
 // ======================================================
 
@@ -115,7 +139,7 @@ async function enrichAcademicRecords(records) {
 }
 
 // ======================================================
-// UNIVERSITY-WIDE STUDENT DIRECTORY
+// SCHOOL-SPECIFIC STUDENT DIRECTORY
 // ======================================================
 
 export async function getStudentDirectory({
@@ -127,19 +151,27 @@ export async function getStudentDirectory({
   page = 1,
   limit = DEFAULT_PAGE_SIZE,
 } = {}) {
+  if (!schoolId) {
+    throw new Error('School ID is required to access the student directory.')
+  }
+
+  await validateSchool(schoolId)
+
   const safePage = Math.max(1, Number(page) || 1)
   const safeLimit = Math.min(
     MAX_PAGE_SIZE,
     Math.max(1, Number(limit) || DEFAULT_PAGE_SIZE)
   )
 
-  // Start from student_details so unassigned students are included.
+  // Students are associated with schools through student_details.school_id.
+  // This includes students who do not yet have academic records.
   const students = await fetchAllRows(() =>
     supabase
       .from('student_details')
       .select(`
         id,
         profile_id,
+        school_id,
         enrollment_number,
         admission_date,
         admission_batch,
@@ -156,6 +188,7 @@ export async function getStudentDirectory({
           created_at
         )
       `)
+      .eq('school_id', schoolId)
       .eq('profiles.role', 'student')
       .order('created_at', { ascending: false })
   )
@@ -165,6 +198,7 @@ export async function getStudentDirectory({
     supabase
       .from('student_academic_records')
       .select('*')
+      .eq('school_id', schoolId)
       .eq('record_status', 'active')
       .order('created_at', { ascending: false })
   )
@@ -172,7 +206,7 @@ export async function getStudentDirectory({
   const enrichedRecords =
     await enrichAcademicRecords(academicRecords)
 
-  // Keep the latest active academic placement for directory display.
+  // Keep the latest active academic placement for each student.
   const latestRecordMap = new Map()
 
   for (const record of enrichedRecords) {
@@ -190,6 +224,7 @@ export async function getStudentDirectory({
     return {
       id: student.id,
       profile_id: student.profile_id,
+      school_id: student.school_id,
       enrollment_number: student.enrollment_number,
       admission_date: student.admission_date,
       admission_batch: student.admission_batch,
@@ -217,7 +252,9 @@ export async function getStudentDirectory({
         student.profile.email,
         student.profile.phone,
         student.enrollment_number,
-      ].join(' ').toLowerCase()
+        student.academic_record?.department?.name,
+        student.academic_record?.specialization?.name,
+      ].filter(Boolean).join(' ').toLowerCase()
 
       return searchable.includes(normalizedSearch)
     })
@@ -229,15 +266,10 @@ export async function getStudentDirectory({
     )
   }
 
-  if (schoolId) {
-    result = result.filter(
-      student => student.academic_record?.school_id === schoolId
-    )
-  }
-
   if (departmentId) {
     result = result.filter(
-      student => student.academic_record?.department_id === departmentId
+      student =>
+        student.academic_record?.department_id === departmentId
     )
   }
 
@@ -266,12 +298,13 @@ export async function getStudentDirectory({
 // GET ONE STUDENT
 // ======================================================
 
-export async function getStudentById(studentId) {
-  const { data: student, error } = await supabase
+export async function getStudentById(studentId, schoolId = '') {
+  let query = supabase
     .from('student_details')
     .select(`
       id,
       profile_id,
+      school_id,
       enrollment_number,
       admission_date,
       admission_batch,
@@ -290,7 +323,12 @@ export async function getStudentById(studentId) {
     `)
     .eq('id', studentId)
     .eq('profiles.role', 'student')
-    .maybeSingle()
+
+  if (schoolId) {
+    query = query.eq('school_id', schoolId)
+  }
+
+  const { data: student, error } = await query.maybeSingle()
 
   if (error) throw new Error(error.message)
   if (!student) return null
@@ -309,6 +347,7 @@ export async function getStudentById(studentId) {
   return {
     id: student.id,
     profile_id: student.profile_id,
+    school_id: student.school_id,
     enrollment_number: student.enrollment_number,
     admission_date: student.admission_date,
     admission_batch: student.admission_batch,
@@ -333,7 +372,21 @@ export async function getStudentById(studentId) {
 // STUDENT FORM OPTIONS
 // ======================================================
 
-export async function getStudentFormOptions() {
+export async function getStudentFormOptions(schoolId = '') {
+  if (schoolId) {
+    await validateSchool(schoolId)
+  }
+
+  let departmentsQuery = supabase
+    .from('departments')
+    .select('id, school_id, name, code')
+    .eq('is_active', true)
+    .order('name')
+
+  if (schoolId) {
+    departmentsQuery = departmentsQuery.eq('school_id', schoolId)
+  }
+
   const [
     schoolsResult,
     departmentsResult,
@@ -347,11 +400,7 @@ export async function getStudentFormOptions() {
       .eq('is_active', true)
       .order('name'),
 
-    supabase
-      .from('departments')
-      .select('id, school_id, name, code')
-      .eq('is_active', true)
-      .order('name'),
+    departmentsQuery,
 
     supabase
       .from('specializations')
@@ -393,7 +442,7 @@ export async function getStudentFormOptions() {
 }
 
 // ======================================================
-// VALIDATE OPTIONAL ACADEMIC PLACEMENT
+// VALIDATE ACADEMIC PLACEMENT
 // ======================================================
 
 async function validateAcademicPlacement(placement) {
@@ -423,6 +472,7 @@ async function validateAcademicPlacement(placement) {
     .maybeSingle()
 
   if (termError) throw new Error(termError.message)
+
   if (!term || !term.is_active) {
     throw new Error('Selected semester does not exist or is inactive.')
   }
@@ -440,20 +490,12 @@ async function validateAcademicPlacement(placement) {
     .maybeSingle()
 
   if (yearError) throw new Error(yearError.message)
+
   if (!year || !year.is_active) {
     throw new Error('Selected academic year is inactive.')
   }
 
-  const { data: school, error: schoolError } = await supabase
-    .from('schools')
-    .select('id, is_active')
-    .eq('id', schoolId)
-    .maybeSingle()
-
-  if (schoolError) throw new Error(schoolError.message)
-  if (!school || !school.is_active) {
-    throw new Error('Selected school does not exist or is inactive.')
-  }
+  await validateSchool(schoolId)
 
   const { data: department, error: departmentError } = await supabase
     .from('departments')
@@ -462,6 +504,7 @@ async function validateAcademicPlacement(placement) {
     .maybeSingle()
 
   if (departmentError) throw new Error(departmentError.message)
+
   if (
     !department ||
     !department.is_active ||
@@ -501,6 +544,7 @@ export async function createStudent({
   email,
   phone,
   enrollmentNumber,
+  schoolId,
   admissionDate = null,
   admissionBatch = null,
   academicPlacement = null,
@@ -515,7 +559,10 @@ export async function createStudent({
     )
   }
 
-  // Academic placement is optional, but if supplied it must be complete.
+  // A student must belong to a school even without academic placement.
+  await validateSchool(schoolId)
+
+  // Academic placement is optional, but if supplied it must match the school.
   if (academicPlacement) {
     const requiredFields = [
       'academicTermId',
@@ -527,6 +574,12 @@ export async function createStudent({
 
     if (requiredFields.some(field => !academicPlacement[field])) {
       throw new Error('Please provide complete academic placement details.')
+    }
+
+    if (academicPlacement.schoolId !== schoolId) {
+      throw new Error(
+        'Academic placement school must match the selected student school.'
+      )
     }
 
     await validateAcademicPlacement(academicPlacement)
@@ -587,13 +640,16 @@ export async function createStudent({
       })
 
     if (profileError) {
-      throw new Error(`Student profile creation failed: ${profileError.message}`)
+      throw new Error(
+        `Student profile creation failed: ${profileError.message}`
+      )
     }
 
     const { data: student, error: studentError } = await supabase
       .from('student_details')
       .insert({
         profile_id: userId,
+        school_id: schoolId,
         enrollment_number: normalizedEnrollment,
         admission_date: admissionDate || null,
         admission_batch: admissionBatch || null,
@@ -602,7 +658,9 @@ export async function createStudent({
       .single()
 
     if (studentError) {
-      throw new Error(`Student details creation failed: ${studentError.message}`)
+      throw new Error(
+        `Student details creation failed: ${studentError.message}`
+      )
     }
 
     // Academic record is created only when a valid placement is supplied.
@@ -612,7 +670,7 @@ export async function createStudent({
         .insert({
           student_id: student.id,
           academic_term_id: academicPlacement.academicTermId,
-          school_id: academicPlacement.schoolId,
+          school_id: schoolId,
           department_id: academicPlacement.departmentId,
           specialization_id: academicPlacement.specializationId,
           academic_year_level: academicPlacement.academicYearLevel,
@@ -631,6 +689,7 @@ export async function createStudent({
     return {
       id: student.id,
       profile_id: userId,
+      school_id: student.school_id,
       enrollment_number: student.enrollment_number,
       account_status: 'pending',
       force_password_change: true,
@@ -657,21 +716,58 @@ export async function createStudent({
 // UPDATE STUDENT ACCOUNT STATUS
 // ======================================================
 
-export async function setStudentAccountStatus(studentId, accountStatus) {
+export async function setStudentAccountStatus(
+  studentId,
+  accountStatus,
+  schoolId = ''
+) {
   const allowedStatuses = ['active', 'suspended', 'disabled']
 
   if (!allowedStatuses.includes(accountStatus)) {
     throw new Error('Invalid student account status.')
   }
 
-  const { data: student, error: studentError } = await supabase
+  let studentQuery = supabase
     .from('student_details')
-    .select('id, profile_id')
+    .select('id, profile_id, school_id')
     .eq('id', studentId)
-    .maybeSingle()
+
+  if (schoolId) {
+    studentQuery = studentQuery.eq('school_id', schoolId)
+  }
+
+  const { data: student, error: studentError } =
+    await studentQuery.maybeSingle()
 
   if (studentError) throw new Error(studentError.message)
-  if (!student) throw new Error('Student not found.')
+  if (!student) throw new Error('Student not found in this school.')
+
+  const { data: currentProfile, error: currentProfileError } =
+    await supabase
+      .from('profiles')
+      .select('id, account_status')
+      .eq('id', student.profile_id)
+      .eq('role', 'student')
+      .maybeSingle()
+
+  if (currentProfileError) {
+    throw new Error(currentProfileError.message)
+  }
+
+  if (!currentProfile) {
+    throw new Error('Student profile not found.')
+  }
+
+  // Pending accounts must complete OTP verification and password setup.
+  // Admins cannot activate them directly.
+  if (
+    currentProfile.account_status === 'pending' &&
+    accountStatus === 'active'
+  ) {
+    throw new Error(
+      'Pending students must complete first-login verification and password setup before activation.'
+    )
+  }
 
   const { data, error } = await supabase
     .from('profiles')
