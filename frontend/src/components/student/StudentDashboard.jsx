@@ -23,6 +23,7 @@ import {
 import api from '../../services/api'
 import './StudentDashboard.css'
 import StudentElectives from './StudentElectives'
+import StudentNotifications from './StudentNotifications'
 
 const navigationItems = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -555,6 +556,8 @@ function StudentDashboard({ profile, onLogout }) {
   if (activeSection === 'profile') return renderProfile()
   if (activeSection === 'academics') return renderAcademics()
   if (activeSection === 'electives') return <StudentElectives />
+  if (activeSection === 'notifications') return <StudentNotifications />
+
 
   return renderComingSoon(activeSection)
 }

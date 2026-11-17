@@ -15,6 +15,13 @@ import {
   selectMyElective,
 } from '../controllers/studentElectiveController.js'
 
+import {
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from '../controllers/studentNotificationController.js'
+
 const router = Router()
 
 // All student routes require an authenticated student account.
@@ -28,5 +35,11 @@ router.get('/electives', getAvailableElectives)
 router.get('/electives/selection', getMyElectiveSelection)
 router.get('/electives/:offeringId', getElectiveDetails)
 router.post('/electives/select', selectMyElective)
+
+// Student notifications.
+router.get('/notifications/unread-count', getUnreadNotificationCount)
+router.get('/notifications', getNotifications)
+router.patch('/notifications/read-all', markAllNotificationsAsRead)
+router.patch('/notifications/:notificationId/read', markNotificationAsRead)
 
 export default router
