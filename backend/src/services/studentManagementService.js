@@ -880,3 +880,245 @@ export async function assignStudentAcademicRecord(
 
   return academicHistory[0]
 }
+
+
+
+export async function bulkCreateSchoolStudents(schoolId, rows = []) {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('Please provide at least one student record.')
+  }
+
+  if (rows.length > 200) {
+    throw new Error('Maximum 200 student records per upload.')
+  }
+
+  await validateSchool(schoolId)
+
+  // Load active academic options for this school.
+  const options = await getStudentFormOptions(schoolId)
+
+  const academicYearsByCode = new Map(
+    options.academic_years.map((year) => [
+      String(year.code || '').trim().toLowerCase(),
+      year,
+    ])
+  )
+
+  const semestersByNumber = new Map(
+    options.semesters.map((term) => [
+      String(term.semester_number),
+      term,
+    ])
+  )
+
+  const departmentsByCode = new Map(
+    options.departments.map((department) => [
+      String(department.code || '').trim().toLowerCase(),
+      department,
+    ])
+  )
+
+  const specializationsByCode = new Map(
+    options.specializations.map((specialization) => [
+      String(specialization.code || '').trim().toLowerCase(),
+      specialization,
+    ])
+  )
+
+  const preparedRows = rows.map((row, index) => {
+    const email = String(row.email || '').trim().toLowerCase()
+    const enrollmentNumber = String(row.enrollment_number || '').trim()
+
+    const academicValues = [
+      row.academic_year_code,
+      row.semester_number,
+      row.department_code,
+      row.academic_year_level,
+      row.specialization_code,
+      row.division,
+      row.roll_number,
+    ]
+
+    const hasAcademicDetails = academicValues.some(
+      (value) => String(value || '').trim() !== ''
+    )
+
+    const errors = []
+
+    let academicPlacement = null
+
+    if (hasAcademicDetails) {
+      const academicYearCode = String(
+        row.academic_year_code || ''
+      ).trim().toLowerCase()
+
+      const semesterNumber = String(
+        row.semester_number || ''
+      ).trim()
+
+      const departmentCode = String(
+        row.department_code || ''
+      ).trim().toLowerCase()
+
+      const specializationCode = String(
+        row.specialization_code || ''
+      ).trim().toLowerCase()
+
+      const academicYearLevel = String(
+        row.academic_year_level || ''
+      ).trim().toUpperCase()
+
+      const academicYear = academicYearsByCode.get(academicYearCode)
+      const semester = semestersByNumber.get(semesterNumber)
+      const department = departmentsByCode.get(departmentCode)
+
+      if (!academicYearCode || !academicYear) {
+        errors.push('Academic year code is invalid or inactive.')
+      }
+
+      if (!semesterNumber || !semester) {
+        errors.push('Semester number is invalid or inactive.')
+      } else if (
+        academicYear &&
+        semester.academic_year_id !== academicYear.id
+      ) {
+        errors.push('Semester does not belong to the selected academic year.')
+      }
+
+      if (!departmentCode || !department) {
+        errors.push('Department code is invalid or inactive for this school.')
+      }
+
+      if (!['FY', 'SY', 'TY', 'LY'].includes(academicYearLevel)) {
+        errors.push('Academic year level must be FY, SY, TY or LY.')
+      }
+
+      let specialization = null
+
+      if (specializationCode) {
+        specialization = specializationsByCode.get(specializationCode)
+
+        if (!specialization) {
+          errors.push('Specialization code is invalid or inactive.')
+        } else if (
+          department &&
+          specialization.department_id !== department.id
+        ) {
+          errors.push('Specialization does not belong to the selected department.')
+        }
+      }
+
+      if (
+        academicYear &&
+        semester &&
+        department &&
+        ['FY', 'SY', 'TY', 'LY'].includes(academicYearLevel)
+      ) {
+        academicPlacement = {
+          academicTermId: semester.id,
+          schoolId,
+          departmentId: department.id,
+          specializationId: specialization?.id || null,
+          academicYearLevel,
+          division: String(row.division || '').trim() || null,
+          rollNumber: String(row.roll_number || '').trim() || null,
+        }
+      }
+    }
+
+    return {
+      rowNumber: index + 1,
+      row,
+      email,
+      enrollmentNumber,
+      academicPlacement,
+      errors,
+    }
+  })
+
+  // Detect duplicates inside the uploaded CSV before creating accounts.
+  const emailCounts = new Map()
+  const enrollmentCounts = new Map()
+
+  for (const item of preparedRows) {
+    if (item.email) {
+      emailCounts.set(
+        item.email,
+        (emailCounts.get(item.email) || 0) + 1
+      )
+    }
+
+    if (item.enrollmentNumber) {
+      const key = item.enrollmentNumber.toLowerCase()
+
+      enrollmentCounts.set(
+        key,
+        (enrollmentCounts.get(key) || 0) + 1
+      )
+    }
+  }
+
+  const created = []
+  const errors = []
+
+  for (const item of preparedRows) {
+    const { row, rowNumber } = item
+
+    const email = item.email
+    const enrollmentNumber = item.enrollmentNumber
+
+    if (emailCounts.get(email) > 1) {
+      item.errors.push('Email address is duplicated in this CSV.')
+    }
+
+    if (
+      enrollmentCounts.get(enrollmentNumber.toLowerCase()) > 1
+    ) {
+      item.errors.push('Enrollment number is duplicated in this CSV.')
+    }
+
+    if (item.errors.length > 0) {
+      errors.push({
+        row: rowNumber,
+        enrollment_number: row.enrollment_number || '',
+        email: row.email || '',
+        message: item.errors.join(' '),
+      })
+
+      continue
+    }
+
+    try {
+      const result = await createStudent({
+        fullName: String(row.full_name || '').trim(),
+        email,
+        phone: String(row.phone || '').trim(),
+        enrollmentNumber,
+        schoolId,
+        admissionDate: String(row.admission_date || '').trim() || null,
+        admissionBatch: String(row.admission_batch || '').trim() || null,
+        academicPlacement: item.academicPlacement,
+      })
+
+      created.push({
+        row: rowNumber,
+        ...result,
+      })
+    } catch (error) {
+      errors.push({
+        row: rowNumber,
+        enrollment_number: row.enrollment_number || '',
+        email: row.email || '',
+        message: error.message,
+      })
+    }
+  }
+
+  return {
+    total: rows.length,
+    successful: created.length,
+    failed: errors.length,
+    created,
+    errors,
+  }
+}

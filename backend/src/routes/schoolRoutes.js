@@ -17,6 +17,7 @@ import {
   getSchoolStudentDetails,
   getSchoolStudentOptions,
   addSchoolStudent,
+  bulkAddSchoolStudents,
   changeSchoolStudentAccountStatus,
   assignSchoolStudentAcademicRecord,
 } from '../controllers/studentManagementController.js'
@@ -78,6 +79,8 @@ router.get('/:schoolId/students/options', getSchoolStudentOptions)
 router.get('/:schoolId/students', getSchoolStudents)
 
 router.get('/:schoolId/students/:studentId', getSchoolStudentDetails)
+
+router.post('/:schoolId/students/bulk', bulkAddSchoolStudents)
 
 router.post('/:schoolId/students', addSchoolStudent)
 

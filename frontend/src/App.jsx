@@ -17,6 +17,7 @@ import './App.css'
 import authService from './services/authService'
 import AdminDashboard from './components/admin/AdminDashboard'
 import SchoolDashboard from './components/school/SchoolDashboard'
+import StudentDashboard from './components/student/StudentDashboard'
 
 function App() {
   const [screen, setScreen] = useState('login')
@@ -344,6 +345,17 @@ function App() {
       description: 'Your university account is authenticated.',
     },
   }[screen]
+
+
+  // STUDENT DASHBOARD
+if (screen === 'dashboard' && profile?.role === 'student') {
+  return (
+    <StudentDashboard
+      profile={profile}
+      onLogout={handleLogout}
+    />
+  )
+}
 
   // UNIVERSITY ADMIN DASHBOARD
   if (screen === 'dashboard' && profile?.role === 'admin') {

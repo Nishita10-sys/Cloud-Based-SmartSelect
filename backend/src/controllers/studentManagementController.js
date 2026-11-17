@@ -6,6 +6,7 @@ import {
   getStudentById,
   getStudentFormOptions,
   createStudent,
+   bulkCreateSchoolStudents,
   setStudentAccountStatus,
   assignStudentAcademicRecord,
 } from '../services/studentManagementService.js'
@@ -65,6 +66,37 @@ const createStudentSchema = z.object({
   admissionBatch: z.string().trim().max(50).nullable().optional(),
   academicPlacement: academicPlacementSchema,
 })
+
+
+const bulkStudentRowSchema = z.object({
+  full_name: z.string().trim().min(2).max(255),
+  email: z.string().trim().email().max(255),
+  phone: z.string().trim().regex(
+    /^\+[1-9][0-9]{7,14}$/,
+    'Phone must include country code.'
+  ),
+  enrollment_number: z.string().trim().min(1).max(100),
+
+  admission_date: z.union([
+    z.iso.date(),
+    z.literal(''),
+  ]).optional().default(''),
+
+  admission_batch: z.string().trim().max(50).optional().default(''),
+
+  academic_year_code: z.string().trim().max(50).optional().default(''),
+  semester_number: z.string().trim().max(10).optional().default(''),
+  department_code: z.string().trim().max(50).optional().default(''),
+  specialization_code: z.string().trim().max(50).optional().default(''),
+  academic_year_level: z.string().trim().max(10).optional().default(''),
+  division: z.string().trim().max(50).optional().default(''),
+  roll_number: z.string().trim().max(50).optional().default(''),
+})
+
+const bulkStudentSchema = z.object({
+  students: z.array(bulkStudentRowSchema).min(1).max(200),
+})
+
 
 const accountStatusSchema = z.object({
   accountStatus: z.enum(['active', 'suspended', 'disabled']),
@@ -379,6 +411,39 @@ export async function addSchoolStudent(req, res) {
     return sendStudentError(res, error, 'create')
   }
 }
+
+
+
+export async function bulkAddSchoolStudents(req, res) {
+  const schoolId = validateSchoolId(req, res)
+  if (!schoolId) return
+
+  const validation = bulkStudentSchema.safeParse(req.body)
+
+  if (!validation.success) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please correct the uploaded student data.',
+      errors: validation.error.issues,
+    })
+  }
+
+  try {
+    const result = await bulkCreateSchoolStudents(
+      schoolId,
+      validation.data.students
+    )
+
+    return res.status(200).json({
+      success: true,
+      message: 'Bulk student registration processed.',
+      data: result,
+    })
+  } catch (error) {
+    return sendStudentError(res, error, 'bulk create')
+  }
+}
+
 
 export async function changeSchoolStudentAccountStatus(req, res) {
   const schoolId = validateSchoolId(req, res)

@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Search,
   Plus,
@@ -13,8 +13,12 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
+  Upload,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react'
 
+import Papa from 'papaparse'
 import schoolService from '../../services/schoolService'
 import './StudentManagement.css'
 
@@ -36,6 +40,22 @@ const emptyAcademicForm = {
   division: '',
   rollNumber: '',
 }
+
+const studentCsvHeaders = [
+  'full_name',
+  'email',
+  'phone',
+  'enrollment_number',
+  'admission_date',
+  'admission_batch',
+  'academic_year_code',
+  'semester_number',
+  'department_code',
+  'specialization_code',
+  'academic_year_level',
+  'division',
+  'roll_number',
+]
 
 function getProfile(student) {
   return student?.profile || student?.profiles || student || {}
@@ -108,6 +128,17 @@ function getAcademicHistory(student) {
   return student?.academicHistory || student?.academic_history || []
 }
 
+function isValidDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+
+  const date = new Date(`${value}T00:00:00`)
+
+  return (
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value
+  )
+}
+
 export default function StudentManagement({ schoolId }) {
   const [students, setStudents] = useState([])
 
@@ -135,6 +166,15 @@ export default function StudentManagement({ schoolId }) {
   const [saving, setSaving] = useState(false)
 
   const [showAddModal, setShowAddModal] = useState(false)
+
+  // BULK STUDENT CSV UPLOAD
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [csvRows, setCsvRows] = useState([])
+  const [csvErrors, setCsvErrors] = useState([])
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkResult, setBulkResult] = useState(null)
+  const fileInputRef = useRef(null)
+
   const [selectedStudent, setSelectedStudent] = useState(null)
 
   const [showAcademicModal, setShowAcademicModal] = useState(false)
@@ -231,6 +271,318 @@ export default function StudentManagement({ schoolId }) {
   }, [loadStudents])
 
   // ====================================================
+  // STUDENT CSV TEMPLATE
+  // ====================================================
+
+  function downloadStudentTemplate() {
+    const csv = Papa.unparse({
+      fields: studentCsvHeaders,
+      data: [],
+    })
+
+    const blob = new Blob([csv], {
+      type: 'text/csv;charset=utf-8;',
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = 'SmartSelect_Student_Template.csv'
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    URL.revokeObjectURL(url)
+  }
+
+  // ====================================================
+  // VALIDATE STUDENT CSV ROWS
+  // ====================================================
+
+  function validateStudentCsvRows(rows) {
+    const seenEmails = new Set()
+    const seenEnrollments = new Set()
+
+    return rows.map((row, index) => {
+      const errors = []
+
+      const email = String(row.email || '').trim().toLowerCase()
+      const enrollmentNumber = String(
+        row.enrollment_number || ''
+      ).trim()
+
+      const fullName = String(row.full_name || '').trim()
+      const phone = String(row.phone || '').trim()
+
+      const admissionDate = String(
+        row.admission_date || ''
+      ).trim()
+
+      if (fullName.length < 2 || fullName.length > 255) {
+        errors.push('Full name must contain 2–255 characters.')
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errors.push('Enter a valid email address.')
+      }
+
+      if (!/^\+[1-9][0-9]{7,14}$/.test(phone)) {
+        errors.push(
+          'Phone must include country code, e.g. +919876543210.'
+        )
+      }
+
+      if (!enrollmentNumber || enrollmentNumber.length > 100) {
+        errors.push('Enrollment number is required and must not exceed 100 characters.')
+      }
+
+      if (admissionDate && !isValidDate(admissionDate)) {
+        errors.push('Admission date must be a valid date in YYYY-MM-DD format.')
+      }
+
+      if (email) {
+        if (seenEmails.has(email)) {
+          errors.push('Duplicate email address in this CSV.')
+        }
+
+        seenEmails.add(email)
+      }
+
+      const normalizedEnrollment = enrollmentNumber.toLowerCase()
+
+      if (normalizedEnrollment) {
+        if (seenEnrollments.has(normalizedEnrollment)) {
+          errors.push('Duplicate enrollment number in this CSV.')
+        }
+
+        seenEnrollments.add(normalizedEnrollment)
+      }
+
+      const academicFields = [
+        row.academic_year_code,
+        row.semester_number,
+        row.department_code,
+        row.specialization_code,
+        row.academic_year_level,
+        row.division,
+        row.roll_number,
+      ]
+
+      const hasAcademicDetails = academicFields.some(
+        (value) => String(value || '').trim() !== ''
+      )
+
+      if (hasAcademicDetails) {
+        if (!String(row.academic_year_code || '').trim()) {
+          errors.push('Academic year code is required when academic details are supplied.')
+        }
+
+        if (!/^[1-8]$/.test(String(row.semester_number || '').trim())) {
+          errors.push('Semester number must be between 1 and 8.')
+        }
+
+        if (!String(row.department_code || '').trim()) {
+          errors.push('Department code is required when academic details are supplied.')
+        }
+
+        if (!['FY', 'SY', 'TY', 'LY'].includes(
+          String(row.academic_year_level || '').trim().toUpperCase()
+        )) {
+          errors.push('Academic year level must be FY, SY, TY or LY.')
+        }
+      }
+
+      return {
+        ...row,
+        full_name: fullName,
+        email,
+        phone,
+        enrollment_number: enrollmentNumber,
+        _rowNumber: index + 2,
+        _errors: errors,
+      }
+    })
+  }
+
+  // ====================================================
+  // HANDLE CSV FILE SELECTION
+  // ====================================================
+
+  function handleStudentCsvFile(event) {
+    const file = event.target.files?.[0]
+
+    if (!file) return
+
+    setCsvRows([])
+    setCsvErrors([])
+    setBulkResult(null)
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setCsvErrors(['Please select a CSV file.'])
+      event.target.value = ''
+      return
+    }
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim().toLowerCase(),
+
+      complete: (results) => {
+        if (results.errors?.length > 0) {
+          setCsvErrors(
+            results.errors.map(
+              (error) =>
+                `CSV parsing error: ${error.message}`
+            )
+          )
+          return
+        }
+
+        const headers = results.meta.fields || []
+
+        const missingHeaders = studentCsvHeaders.filter(
+          (header) =>
+            !headers.includes(header) &&
+            [
+              'full_name',
+              'email',
+              'phone',
+              'enrollment_number',
+            ].includes(header)
+        )
+
+        if (missingHeaders.length > 0) {
+          setCsvErrors([
+            `Missing required columns: ${missingHeaders.join(', ')}`,
+          ])
+          return
+        }
+
+        if (results.data.length === 0) {
+          setCsvErrors(['The CSV file contains no student records.'])
+          return
+        }
+
+        if (results.data.length > 200) {
+          setCsvErrors([
+            `Maximum 200 students per upload. Your file contains ${results.data.length} records.`,
+          ])
+          return
+        }
+
+        const validatedRows = validateStudentCsvRows(results.data)
+
+        const allErrors = validatedRows.flatMap((row) =>
+          row._errors.map((error) => ({
+            row: row._rowNumber,
+            message: error,
+          }))
+        )
+
+        setCsvRows(validatedRows)
+        setCsvErrors(allErrors)
+      },
+
+      error: (error) => {
+        setCsvErrors([
+          error.message || 'Unable to read the CSV file.',
+        ])
+      },
+    })
+  }
+
+  // ====================================================
+  // CLOSE CSV MODAL
+  // ====================================================
+
+  function closeBulkModal() {
+    if (bulkLoading) return
+
+    setShowBulkModal(false)
+    setCsvRows([])
+    setCsvErrors([])
+    setBulkResult(null)
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // ====================================================
+  // BULK STUDENT REGISTRATION
+  // ====================================================
+
+  async function handleStudentBulkUpload() {
+    if (!schoolId) return
+
+    if (csvRows.length === 0) {
+      setCsvErrors([
+        'Please select a CSV file containing student records.',
+      ])
+      return
+    }
+
+    if (csvErrors.length > 0) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `You are about to register ${csvRows.length} students. Continue?`
+    )
+
+    if (!confirmed) return
+
+    setBulkLoading(true)
+    setBulkResult(null)
+
+    try {
+      const studentRows = csvRows.map((row) => {
+        const {
+          _rowNumber,
+          _errors,
+          ...student
+        } = row
+
+        return student
+      })
+
+      const response = await schoolService.bulkCreateStudents(
+        schoolId,
+        studentRows
+      )
+
+      const result = response?.data || response
+
+      setBulkResult(result)
+
+      await loadStudents()
+
+      setMessage({
+        type:
+          result.failed > 0
+            ? 'error'
+            : 'success',
+        text:
+          result.failed > 0
+            ? `Bulk registration completed: ${result.successful} successful and ${result.failed} failed.`
+            : `${result.successful} students registered successfully.`,
+      })
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text:
+          error.response?.data?.message ||
+          'Unable to process the student CSV upload.',
+      })
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  // ====================================================
   // FORM HANDLING
   // ====================================================
 
@@ -304,6 +656,7 @@ export default function StudentManagement({ schoolId }) {
       })
 
       setStudents(updatedResponse?.data || [])
+
       setPagination(
         updatedResponse?.pagination || {
           page: 1,
@@ -623,6 +976,19 @@ export default function StudentManagement({ schoolId }) {
           </button>
 
           <button
+            className="student-btn student-btn-secondary"
+            onClick={() => {
+              setCsvRows([])
+              setCsvErrors([])
+              setBulkResult(null)
+              setShowBulkModal(true)
+            }}
+          >
+            <Upload size={16} />
+            Bulk CSV Upload
+          </button>
+
+          <button
             className="student-btn student-btn-primary"
             onClick={() => {
               setForm(emptyForm)
@@ -891,6 +1257,246 @@ export default function StudentManagement({ schoolId }) {
           </div>
         </div>
       </div>
+
+      {/* BULK STUDENT CSV MODAL */}
+
+      {showBulkModal && (
+        <div className="student-modal-overlay">
+          <div className="student-modal student-bulk-modal">
+
+            <div className="student-modal-header">
+              <div>
+                <span className="student-management-eyebrow">
+                  STUDENT IMPORT
+                </span>
+
+                <h3>Bulk CSV Upload</h3>
+
+                <p>
+                  Register multiple students for this school.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeBulkModal}
+                aria-label="Close"
+                disabled={bulkLoading}
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            <div className="student-csv-template">
+              <div>
+                <FileSpreadsheet size={22} />
+
+                <div>
+                  <strong>Student CSV Template</strong>
+                  <span>
+                    Download the required format before preparing your file.
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="student-btn student-btn-secondary"
+                onClick={downloadStudentTemplate}
+              >
+                <Download size={16} />
+                Download Template
+              </button>
+            </div>
+
+            <div className="student-csv-instructions">
+              <strong>Important instructions</strong>
+
+              <ul>
+                <li>Maximum 200 students per upload.</li>
+                <li>Full name, email, phone and enrollment number are required.</li>
+                <li>Phone numbers must include the country code, e.g. +919876543210.</li>
+                <li>Admission date must use YYYY-MM-DD format.</li>
+                <li>Academic details are optional. If supplied, academic year code, semester number, department code and year level are required.</li>
+                <li>Use the exact academic year, department and specialization codes configured in SmartSelect.</li>
+                <li>New student accounts will be created with pending activation status.</li>
+              </ul>
+            </div>
+
+            <div className="student-csv-upload-area">
+              <Upload size={27} />
+
+              <strong>Select Student CSV File</strong>
+
+              <span>
+                Choose a prepared .csv file from your computer.
+              </span>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleStudentCsvFile}
+                disabled={bulkLoading}
+              />
+            </div>
+
+            {csvRows.length > 0 && (
+              <div className="student-csv-preview">
+                <div className="student-csv-preview-heading">
+                  <div>
+                    <strong>CSV Preview</strong>
+                    <span>
+                      {csvRows.length} student record(s) detected
+                    </span>
+                  </div>
+
+                  <span
+                    className={
+                      csvErrors.length > 0
+                        ? 'student-csv-invalid'
+                        : 'student-csv-valid'
+                    }
+                  >
+                    {csvErrors.length > 0
+                      ? `${csvErrors.length} validation issue(s)`
+                      : 'Validation passed'}
+                  </span>
+                </div>
+
+                <div className="student-csv-table-wrapper">
+                  <table className="student-csv-table">
+                    <thead>
+                      <tr>
+                        <th>Row</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Enrollment No.</th>
+                        <th>Phone</th>
+                        <th>Academic Year</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {csvRows.slice(0, 10).map((row) => (
+                        <tr key={row._rowNumber}>
+                          <td>{row._rowNumber}</td>
+                          <td>{row.full_name}</td>
+                          <td>{row.email}</td>
+                          <td>{row.enrollment_number}</td>
+                          <td>{row.phone}</td>
+                          <td>
+                            {row.academic_year_level || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {csvRows.length > 10 && (
+                  <p className="student-csv-more">
+                    Showing the first 10 of {csvRows.length} records.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {csvErrors.length > 0 && (
+              <div className="student-csv-errors">
+                <strong>
+                  Please correct the following issues:
+                </strong>
+
+                <div>
+                  {csvErrors.slice(0, 50).map((error, index) => (
+                    <p key={`${error.row || 'file'}-${index}`}>
+                      {error.row
+                        ? `CSV Row ${error.row}: `
+                        : ''}
+                      {error.message || error}
+                    </p>
+                  ))}
+
+                  {csvErrors.length > 50 && (
+                    <p>
+                      And {csvErrors.length - 50} more issue(s).
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {bulkResult && (
+              <div className="student-bulk-result">
+                <strong>Import Results</strong>
+
+                <div className="student-bulk-result-stats">
+                  <div>
+                    <span>Total</span>
+                    <strong>{bulkResult.total}</strong>
+                  </div>
+
+                  <div>
+                    <span>Successful</span>
+                    <strong>{bulkResult.successful}</strong>
+                  </div>
+
+                  <div>
+                    <span>Failed</span>
+                    <strong>{bulkResult.failed}</strong>
+                  </div>
+                </div>
+
+                {bulkResult.errors?.length > 0 && (
+                  <div className="student-bulk-result-errors">
+                    <strong>Failed Records</strong>
+
+                    {bulkResult.errors.map((error, index) => (
+                      <p key={`${error.row}-${index}`}>
+                        Row {Number(error.row) + 1}
+                        {' — '}
+                        {error.email || error.enrollment_number || 'Student'}
+                        : {error.message}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="student-modal-actions">
+              <button
+                type="button"
+                className="student-btn student-btn-secondary"
+                onClick={closeBulkModal}
+                disabled={bulkLoading}
+              >
+                {bulkResult ? 'Close' : 'Cancel'}
+              </button>
+
+              {!bulkResult && (
+                <button
+                  type="button"
+                  className="student-btn student-btn-primary"
+                  onClick={handleStudentBulkUpload}
+                  disabled={
+                    bulkLoading ||
+                    csvRows.length === 0 ||
+                    csvErrors.length > 0
+                  }
+                >
+                  <Upload size={17} />
+
+                  {bulkLoading
+                    ? 'Registering Students...'
+                    : `Import ${csvRows.length || ''} Students`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADD STUDENT MODAL */}
 

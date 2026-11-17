@@ -82,6 +82,14 @@ const schoolService = {
     return response.data
   },
 
+    async bulkCreateStudents(schoolId, studentRows) {
+    const response = await api.post(
+      `/schools/${schoolId}/students/bulk`,
+      { students: studentRows }
+    )
+    return response.data
+  },
+
   async updateStudentStatus(schoolId, studentId, accountStatus) {
     const response = await api.patch(
       `/schools/${schoolId}/students/${studentId}/status`,
