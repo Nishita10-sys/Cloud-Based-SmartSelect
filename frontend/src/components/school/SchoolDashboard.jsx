@@ -25,6 +25,8 @@ import {
 
 import schoolService from '../../services/schoolService'
 import StudentManagement from '../admin/StudentManagement'
+import FacultyManagement from './FacultyManagement'
+import ElectiveManagement from './ElectiveManagement'
 import './SchoolDashboard.css'
 
 function SchoolDashboard({ school, onBack }) {
@@ -250,12 +252,13 @@ function SchoolDashboard({ school, onBack }) {
     },
   ]
 
+  // School dashboard navigation.
   const navigation = [
     { label: 'Overview', icon: LayoutDashboard, view: 'overview' },
     { label: 'Students', icon: Users, view: 'students' },
-    { label: 'Faculty', icon: UserRound },
+    { label: 'Faculty', icon: UserRound, view: 'faculty' },
     { label: 'Departments', icon: Building2, view: 'departments' },
-    { label: 'Electives', icon: BookOpen },
+    { label: 'Electives', icon: BookOpen, view: 'electives' },
     { label: 'Reports', icon: BarChart3 },
     { label: 'Settings', icon: Settings },
   ]
@@ -270,9 +273,19 @@ function SchoolDashboard({ school, onBack }) {
     )
   })
 
+
+  const currentViewLabel = {
+  overview: 'School Overview',
+  students: 'Students',
+  faculty: 'Faculty Management',
+  departments: 'Departments',
+  electives: 'Elective Management',
+}
+
   return (
     <div className="school-dashboard">
 
+      {/* SIDEBAR */}
       <aside className="school-sidebar">
         <div className="school-brand">
           <div className="school-brand-icon">
@@ -306,6 +319,7 @@ function SchoolDashboard({ school, onBack }) {
                     setCurrentView(item.view)
                     setSuccessMessage('')
                     setDepartmentError('')
+                    setError('')
                   }
                 }}
                 disabled={!item.view}
@@ -329,6 +343,7 @@ function SchoolDashboard({ school, onBack }) {
         </div>
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="school-main">
 
         <header className="school-topbar">
@@ -345,13 +360,7 @@ function SchoolDashboard({ school, onBack }) {
             <span className="school-breadcrumb-divider">/</span>
 
             <span>
-              {currentView === 'overview'
-                ? 'School Overview'
-                : currentView === 'departments'
-                  ? 'Departments'
-                  : currentView === 'students'
-                    ? 'Students'
-                    : currentView}
+              {currentViewLabel[currentView] || currentView}
             </span>
           </div>
 
@@ -366,6 +375,7 @@ function SchoolDashboard({ school, onBack }) {
 
         <div className="school-content">
 
+          {/* SCHOOL WELCOME */}
           <section className="school-welcome">
             <div>
               <span className="school-eyebrow">
@@ -527,9 +537,19 @@ function SchoolDashboard({ school, onBack }) {
                 </>
               )}
 
-              {/* SCHOOL-SPECIFIC STUDENT MANAGEMENT */}
+              {/* STUDENT MANAGEMENT */}
               {currentView === 'students' && (
                 <StudentManagement schoolId={school.id} />
+              )}
+
+              {/* FACULTY MANAGEMENT */}
+              {currentView === 'faculty' && (
+                <FacultyManagement schoolId={school.id} />
+              )}
+
+              {/* ELECTIVE MANAGEMENT */}
+              {currentView === 'electives' && (
+                <ElectiveManagement schoolId={school.id} />
               )}
 
               {/* DEPARTMENT MANAGEMENT */}
@@ -847,4 +867,3 @@ function ShieldIcon() {
 }
 
 export default SchoolDashboard
-

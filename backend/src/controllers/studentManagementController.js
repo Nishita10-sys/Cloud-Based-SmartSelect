@@ -7,6 +7,7 @@ import {
   getStudentFormOptions,
   createStudent,
   setStudentAccountStatus,
+  assignStudentAcademicRecord,
 } from '../services/studentManagementService.js'
 
 // ======================================================
@@ -42,7 +43,11 @@ const academicPlacementSchema = z.object({
   academicTermId: z.string().uuid(),
   schoolId: z.string().uuid(),
   departmentId: z.string().uuid(),
-  specializationId: z.string().uuid(),
+  specializationId: z.union([
+    z.string().uuid(),
+    z.literal(''),
+    z.null(),
+  ]).optional().transform((value) => value || null),
   academicYearLevel: z.enum(['FY', 'SY', 'TY', 'LY']),
   division: z.string().trim().max(50).optional().nullable(),
   rollNumber: z.string().trim().max(50).optional().nullable(),
@@ -403,5 +408,53 @@ export async function changeSchoolStudentAccountStatus(req, res) {
     })
   } catch (error) {
     return sendStudentError(res, error, 'update')
+  }
+}
+
+// ======================================================
+// ASSIGN OR UPDATE STUDENT ACADEMIC RECORD
+// ======================================================
+
+export async function assignSchoolStudentAcademicRecord(req, res) {
+  const schoolId = validateSchoolId(req, res)
+  if (!schoolId) return
+
+  const studentValidation = studentIdSchema.safeParse(req.params.studentId)
+
+  if (!studentValidation.success) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide a valid student ID.',
+    })
+  }
+
+  const placementValidation = academicPlacementSchema
+    .nullable()
+    .safeParse(req.body)
+
+  if (!placementValidation.success || !placementValidation.data) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please provide valid academic placement details.',
+      errors: placementValidation.success
+        ? []
+        : placementValidation.error.issues,
+    })
+  }
+
+  try {
+    const academicRecord = await assignStudentAcademicRecord(
+      studentValidation.data,
+      schoolId,
+      placementValidation.data
+    )
+
+    return res.status(200).json({
+      success: true,
+      message: 'Student academic record assigned successfully.',
+      data: academicRecord,
+    })
+  } catch (error) {
+    return sendStudentError(res, error, 'assign academic record to')
   }
 }

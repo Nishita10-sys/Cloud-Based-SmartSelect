@@ -18,26 +18,50 @@ import {
   getSchoolStudentOptions,
   addSchoolStudent,
   changeSchoolStudentAccountStatus,
+  assignSchoolStudentAcademicRecord,
 } from '../controllers/studentManagementController.js'
+
+import {
+  getSchoolFacultyData,
+  getSchoolFacultyOptionsData,
+  getSchoolFacultyDetailsData,
+  addSchoolFaculty,
+  editSchoolFaculty,
+  changeSchoolFacultyAccountStatus,
+  bulkAddSchoolFaculty,
+} from '../controllers/facultyManagementController.js'
+
+import {
+  getSchoolElectiveOptionsData,
+  getSchoolElectivesData,
+  getSchoolElectiveDetailsData,
+  addSchoolElective,
+  editSchoolElective,
+  changeSchoolElectiveStatus,
+  getSchoolElectiveEnrollmentsData,
+  bulkAddSchoolElectives,
+} from '../controllers/electiveManagementController.js'
 
 const router = Router()
 
-// Only authenticated University Admins can access school routes.
+// Authentication and authorization
 router.use(authenticateUser)
 router.use(authorizeRoles('admin'))
 
-// ======================================================
+// --------------------------------------------------
 // SCHOOL DASHBOARD
-// ======================================================
+// --------------------------------------------------
 
 router.get('/:schoolId/dashboard', getSchoolDashboardData)
 
-// ======================================================
+// --------------------------------------------------
 // DEPARTMENT MANAGEMENT
-// ======================================================
+// --------------------------------------------------
 
 router.get('/:schoolId/departments', getDepartments)
+
 router.post('/:schoolId/departments', createDepartmentData)
+
 router.put('/:schoolId/departments/:departmentId', updateDepartmentData)
 
 router.patch(
@@ -45,29 +69,94 @@ router.patch(
   updateDepartmentStatus
 )
 
-// ======================================================
-// SCHOOL STUDENT MANAGEMENT
-// ======================================================
+// --------------------------------------------------
+// STUDENT MANAGEMENT
+// --------------------------------------------------
 
-// Keep options before the studentId route.
 router.get('/:schoolId/students/options', getSchoolStudentOptions)
 
-// Student directory and filters.
 router.get('/:schoolId/students', getSchoolStudents)
 
-// Individual student details.
-router.get(
-  '/:schoolId/students/:studentId',
-  getSchoolStudentDetails
-)
+router.get('/:schoolId/students/:studentId', getSchoolStudentDetails)
 
-// Create a student inside the selected school.
 router.post('/:schoolId/students', addSchoolStudent)
 
-// Update student account status within the selected school.
 router.patch(
   '/:schoolId/students/:studentId/status',
   changeSchoolStudentAccountStatus
+)
+
+router.put(
+  '/:schoolId/students/:studentId/academic-record',
+  assignSchoolStudentAcademicRecord
+)
+
+// --------------------------------------------------
+// FACULTY MANAGEMENT
+// --------------------------------------------------
+
+// Faculty form options
+router.get('/:schoolId/faculty/options', getSchoolFacultyOptionsData)
+
+// Faculty directory
+router.get('/:schoolId/faculty', getSchoolFacultyData)
+
+// Faculty details
+router.get('/:schoolId/faculty/:facultyId', getSchoolFacultyDetailsData)
+
+// Add one faculty member
+router.post('/:schoolId/faculty', addSchoolFaculty)
+
+// Bulk faculty CSV registration
+router.post('/:schoolId/faculty/bulk', bulkAddSchoolFaculty)
+
+// Edit faculty details
+router.put('/:schoolId/faculty/:facultyId', editSchoolFaculty)
+
+// Update faculty account status
+router.patch(
+  '/:schoolId/faculty/:facultyId/status',
+  changeSchoolFacultyAccountStatus
+)
+
+// --------------------------------------------------
+// ELECTIVE MANAGEMENT
+// --------------------------------------------------
+
+// Elective form options
+router.get('/:schoolId/electives/options', getSchoolElectiveOptionsData)
+
+// Elective directory
+router.get('/:schoolId/electives', getSchoolElectivesData)
+
+// Bulk elective CSV registration
+router.post('/:schoolId/electives/bulk', bulkAddSchoolElectives)
+
+// Add one elective
+router.post('/:schoolId/electives', addSchoolElective)
+
+// Elective details
+router.get(
+  '/:schoolId/electives/:offeringId',
+  getSchoolElectiveDetailsData
+)
+
+// Edit elective
+router.put(
+  '/:schoolId/electives/:offeringId',
+  editSchoolElective
+)
+
+// Update elective status
+router.patch(
+  '/:schoolId/electives/:offeringId/status',
+  changeSchoolElectiveStatus
+)
+
+// View student enrollments
+router.get(
+  '/:schoolId/electives/:offeringId/enrollments',
+  getSchoolElectiveEnrollmentsData
 )
 
 export default router

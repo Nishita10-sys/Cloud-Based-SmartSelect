@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
 } from 'lucide-react'
 
 import schoolService from '../../services/schoolService'
@@ -24,6 +25,16 @@ const emptyForm = {
   enrollmentNumber: '',
   admissionDate: '',
   admissionBatch: '',
+}
+
+const emptyAcademicForm = {
+  academicYearId: '',
+  academicTermId: '',
+  departmentId: '',
+  specializationId: '',
+  academicYearLevel: '',
+  division: '',
+  rollNumber: '',
 }
 
 function getProfile(student) {
@@ -93,6 +104,10 @@ function formatStatus(status) {
   return status?.charAt(0).toUpperCase() + status?.slice(1) || 'Unknown'
 }
 
+function getAcademicHistory(student) {
+  return student?.academicHistory || student?.academic_history || []
+}
+
 export default function StudentManagement({ schoolId }) {
   const [students, setStudents] = useState([])
 
@@ -122,7 +137,13 @@ export default function StudentManagement({ schoolId }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState(null)
 
+  const [showAcademicModal, setShowAcademicModal] = useState(false)
+  const [academicStudent, setAcademicStudent] = useState(null)
+  const [academicSaving, setAcademicSaving] = useState(false)
+  const [academicLoading, setAcademicLoading] = useState(false)
+
   const [form, setForm] = useState(emptyForm)
+  const [academicForm, setAcademicForm] = useState(emptyAcademicForm)
 
   const [message, setMessage] = useState({
     type: '',
@@ -220,6 +241,13 @@ export default function StudentManagement({ schoolId }) {
     }))
   }
 
+  function updateAcademicForm(field, value) {
+    setAcademicForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
   // ====================================================
   // CREATE STUDENT
   // ====================================================
@@ -267,7 +295,6 @@ export default function StudentManagement({ schoolId }) {
 
       setPage(1)
 
-      // Reload the directory after creation.
       const updatedResponse = await schoolService.getStudents(schoolId, {
         search,
         accountStatus,
@@ -382,6 +409,172 @@ export default function StudentManagement({ schoolId }) {
       })
     }
   }
+
+  // ====================================================
+  // OPEN ACADEMIC PLACEMENT FORM
+  // ====================================================
+
+  async function handleOpenAcademicPlacement(student) {
+    const details = getDetails(student)
+
+    const studentId =
+      details.id ||
+      student?.studentId ||
+      student?.student_id
+
+    if (!studentId) {
+      setMessage({
+        type: 'error',
+        text: 'Student ID is missing. Unable to assign academic record.',
+      })
+      return
+    }
+
+    setAcademicLoading(true)
+    setAcademicStudent(null)
+    setAcademicForm(emptyAcademicForm)
+    setShowAcademicModal(true)
+    setMessage({ type: '', text: '' })
+
+    try {
+      const response = await schoolService.getStudentDetails(
+        schoolId,
+        studentId
+      )
+
+      const fullStudent = response?.data
+
+      if (!fullStudent) {
+        throw new Error('Student details were not returned by the server.')
+      }
+
+      setAcademicStudent(fullStudent)
+
+      const history = getAcademicHistory(fullStudent)
+      const latestRecord = history[0] || null
+
+      if (latestRecord) {
+        const term = latestRecord.academic_term || {}
+
+        setAcademicForm({
+          academicYearId: term.academic_year_id || '',
+          academicTermId: latestRecord.academic_term_id || '',
+          departmentId: latestRecord.department_id || '',
+          specializationId: latestRecord.specialization_id || '',
+          academicYearLevel: latestRecord.academic_year_level || '',
+          division: latestRecord.division || '',
+          rollNumber: latestRecord.roll_number || '',
+        })
+      } else {
+        const currentYear = options.academicYears.find(
+          (year) => year.is_current
+        )
+
+        setAcademicForm({
+          ...emptyAcademicForm,
+          academicYearId: currentYear?.id || '',
+        })
+      }
+    } catch (error) {
+      setShowAcademicModal(false)
+
+      setMessage({
+        type: 'error',
+        text:
+          error.response?.data?.message ||
+          error.message ||
+          'Unable to load the student academic details.',
+      })
+    } finally {
+      setAcademicLoading(false)
+    }
+  }
+
+  // ====================================================
+  // SAVE ACADEMIC PLACEMENT
+  // ====================================================
+
+  async function handleSaveAcademicPlacement(event) {
+    event.preventDefault()
+
+    if (!academicStudent) return
+
+    if (!academicForm.academicYearId || !academicForm.academicTermId) {
+      setMessage({
+        type: 'error',
+        text: 'Please select an academic year and semester.',
+      })
+      return
+    }
+
+    if (
+      !academicForm.departmentId ||
+      !academicForm.academicYearLevel
+    ) {
+      setMessage({
+        type: 'error',
+        text: 'Please complete the department and year level.',
+      })
+      return
+    }
+
+    setAcademicSaving(true)
+    setMessage({ type: '', text: '' })
+
+    try {
+      const payload = {
+        academicTermId: academicForm.academicTermId,
+        schoolId,
+        departmentId: academicForm.departmentId,
+        specializationId: academicForm.specializationId || null,
+        academicYearLevel: academicForm.academicYearLevel,
+        division: academicForm.division.trim() || null,
+        rollNumber: academicForm.rollNumber.trim() || null,
+      }
+
+      const response = await schoolService.assignStudentAcademicRecord(
+        schoolId,
+        academicStudent.id,
+        payload
+      )
+
+      setShowAcademicModal(false)
+      setAcademicStudent(null)
+      setAcademicForm(emptyAcademicForm)
+
+      setMessage({
+        type: 'success',
+        text:
+          response?.message ||
+          'Student academic record saved successfully.',
+      })
+
+      await loadStudents()
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text:
+          error.response?.data?.message ||
+          'Unable to save the academic record. Please check the selected details.',
+      })
+    } finally {
+      setAcademicSaving(false)
+    }
+  }
+
+  // ====================================================
+  // FILTERED ACADEMIC OPTIONS
+  // ====================================================
+
+  const filteredSemesters = options.semesters.filter(
+    (semester) =>
+      semester.academic_year_id === academicForm.academicYearId
+  )
+
+  const filteredSpecializations = options.specializations.filter(
+    (specialization) =>
+      specialization.department_id === academicForm.departmentId
+  )
 
   // ====================================================
   // RENDER
@@ -612,6 +805,16 @@ export default function StudentManagement({ schoolId }) {
                             <Eye size={17} />
                           </button>
 
+                          <button
+                            className="student-icon-btn"
+                            title="Assign or update academic record"
+                            onClick={() =>
+                              handleOpenAcademicPlacement(student)
+                            }
+                          >
+                            <GraduationCap size={17} />
+                          </button>
+
                           {status === 'active' && (
                             <button
                               className="student-icon-btn student-action-warning"
@@ -831,6 +1034,225 @@ export default function StudentManagement({ schoolId }) {
         </div>
       )}
 
+      {/* ACADEMIC PLACEMENT MODAL */}
+
+      {showAcademicModal && (
+        <div className="student-modal-overlay">
+          <div className="student-modal student-academic-modal">
+
+            <div className="student-modal-header">
+              <div>
+                <span className="student-management-eyebrow">
+                  ACADEMIC MANAGEMENT
+                </span>
+
+                <h3>Assign Academic Record</h3>
+
+                <p>
+                  {academicStudent
+                    ? `${getStudentName(academicStudent)} · ${getEnrollment(academicStudent)}`
+                    : 'Loading student details...'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAcademicModal(false)
+                  setAcademicStudent(null)
+                }}
+                aria-label="Close"
+                disabled={academicSaving}
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            {academicLoading ? (
+              <div className="student-academic-loading">
+                Loading student academic history...
+              </div>
+            ) : (
+              <form onSubmit={handleSaveAcademicPlacement}>
+                <div className="student-form-grid">
+
+                  <label>
+                    Academic Year *
+                    <select
+                      required
+                      value={academicForm.academicYearId}
+                      onChange={(event) => {
+                        const academicYearId = event.target.value
+
+                        updateAcademicForm('academicYearId', academicYearId)
+                        updateAcademicForm('academicTermId', '')
+                      }}
+                    >
+                      <option value="">Select academic year</option>
+
+                      {options.academicYears.map((year) => (
+                        <option key={year.id} value={year.id}>
+                          {year.name}
+                          {year.is_current ? ' (Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Semester *
+                    <select
+                      required
+                      value={academicForm.academicTermId}
+                      onChange={(event) =>
+                        updateAcademicForm('academicTermId', event.target.value)
+                      }
+                      disabled={!academicForm.academicYearId}
+                    >
+                      <option value="">Select semester</option>
+
+                      {filteredSemesters.map((semester) => (
+                        <option key={semester.id} value={semester.id}>
+                          {semester.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Department *
+                    <select
+                      required
+                      value={academicForm.departmentId}
+                      onChange={(event) => {
+                        updateAcademicForm('departmentId', event.target.value)
+                        updateAcademicForm('specializationId', '')
+                      }}
+                    >
+                      <option value="">Select department</option>
+
+                      {options.departments.map((department) => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Specialization (Optional)
+                    <select
+                      value={academicForm.specializationId}
+                      onChange={(event) =>
+                        updateAcademicForm(
+                          'specializationId',
+                          event.target.value
+                        )
+                      }
+                      disabled={!academicForm.departmentId}
+                    >
+                      <option value="">
+                        {academicForm.departmentId
+                          ? filteredSpecializations.length > 0
+                            ? 'No specialization (optional)'
+                            : 'No specializations available'
+                          : 'Select a department first'}
+                      </option>
+
+                      {filteredSpecializations.map((specialization) => (
+                        <option
+                          key={specialization.id}
+                          value={specialization.id}
+                        >
+                          {specialization.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Year Level *
+                    <select
+                      required
+                      value={academicForm.academicYearLevel}
+                      onChange={(event) =>
+                        updateAcademicForm(
+                          'academicYearLevel',
+                          event.target.value
+                        )
+                      }
+                    >
+                      <option value="">Select year level</option>
+                      <option value="FY">First Year (FY)</option>
+                      <option value="SY">Second Year (SY)</option>
+                      <option value="TY">Third Year (TY)</option>
+                      <option value="LY">Last Year (LY)</option>
+                    </select>
+                  </label>
+
+                  <label>
+                    Division
+                    <input
+                      value={academicForm.division}
+                      onChange={(event) =>
+                        updateAcademicForm('division', event.target.value)
+                      }
+                      placeholder="e.g. A"
+                    />
+                  </label>
+
+                  <label>
+                    Roll Number
+                    <input
+                      value={academicForm.rollNumber}
+                      onChange={(event) =>
+                        updateAcademicForm('rollNumber', event.target.value)
+                      }
+                      placeholder="Enter roll number"
+                    />
+                  </label>
+
+                </div>
+
+                <div className="student-form-note">
+                  <GraduationCap size={18} />
+
+                  <p>
+                    Select the semester for this academic record. Saving
+                    against an existing semester updates that record.
+                    Selecting another semester creates a separate entry
+                    in the student's academic history.
+                  </p>
+                </div>
+
+                <div className="student-modal-actions">
+                  <button
+                    type="button"
+                    className="student-btn student-btn-secondary"
+                    onClick={() => {
+                      setShowAcademicModal(false)
+                      setAcademicStudent(null)
+                    }}
+                    disabled={academicSaving}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="student-btn student-btn-primary"
+                    disabled={academicSaving}
+                  >
+                    <GraduationCap size={17} />
+                    {academicSaving ? 'Saving...' : 'Save Academic Record'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* STUDENT DETAILS MODAL */}
 
       {selectedStudent && (
@@ -882,11 +1304,7 @@ export default function StudentManagement({ schoolId }) {
               <div>
                 <span>Academic History</span>
                 <strong>
-                  {(
-                    selectedStudent.academicHistory ||
-                    selectedStudent.academic_history ||
-                    []
-                  ).length} record(s)
+                  {getAcademicHistory(selectedStudent).length} record(s)
                 </strong>
               </div>
             </div>
@@ -896,20 +1314,12 @@ export default function StudentManagement({ schoolId }) {
             </h4>
 
             <div className="student-history-list">
-              {(
-                selectedStudent.academicHistory ||
-                selectedStudent.academic_history ||
-                []
-              ).length === 0 ? (
+              {getAcademicHistory(selectedStudent).length === 0 ? (
                 <p>
                   No academic placement has been assigned yet.
                 </p>
               ) : (
-                (
-                  selectedStudent.academicHistory ||
-                  selectedStudent.academic_history ||
-                  []
-                ).map((record) => (
+                getAcademicHistory(selectedStudent).map((record) => (
                   <div
                     className="student-history-item"
                     key={record.id}
@@ -918,9 +1328,14 @@ export default function StudentManagement({ schoolId }) {
                       {record.academic_year_level ||
                         record.academicYearLevel ||
                         'Year not specified'}
+                      {' · '}
+                      {record.academic_term?.name || 'Semester not specified'}
                     </strong>
 
                     <span>
+                      {record.academic_term?.academic_year?.name ||
+                        'Academic year not specified'}
+                      {' · '}
                       {record.school?.name ||
                         record.school_name ||
                         'School not specified'}
@@ -931,9 +1346,11 @@ export default function StudentManagement({ schoolId }) {
                     </span>
 
                     <small>
-                      {record.record_status ||
-                        record.recordStatus ||
-                        'Status unavailable'}
+                      {record.specialization?.name ||
+                        record.specialization_name ||
+                        'Specialization not specified'}
+                      {record.division ? ` · Division ${record.division}` : ''}
+                      {record.roll_number ? ` · Roll No. ${record.roll_number}` : ''}
                     </small>
                   </div>
                 ))

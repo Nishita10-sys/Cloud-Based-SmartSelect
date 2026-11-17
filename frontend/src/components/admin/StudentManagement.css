@@ -709,3 +709,70 @@
     padding: 0 16px;
   }
 }
+
+/* ======================================================
+   ACADEMIC RECORD MODAL
+====================================================== */
+
+.student-modal select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d5deea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #24344d;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.student-modal select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.student-modal select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.academic-placement-note {
+  margin: 0 22px 18px;
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.academic-history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.academic-history-item strong {
+  color: #24344d;
+  font-size: 13px;
+}
+
+.academic-history-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.academic-history-item small {
+  color: #475569;
+  font-size: 11px;
+}
+
+@media (max-width: 650px) {
+  .academic-placement-note {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+} 

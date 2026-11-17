@@ -30,9 +30,9 @@ async function fetchAllRows(buildQuery) {
 }
 
 async function fetchByIds(table, columns, ids) {
-  if (!ids.length) return []
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
 
-  const uniqueIds = [...new Set(ids)]
+  if (!uniqueIds.length) return []
 
   const { data, error } = await supabase
     .from(table)
@@ -513,25 +513,29 @@ async function validateAcademicPlacement(placement) {
     throw new Error('Selected department does not belong to this school.')
   }
 
-  const { data: specialization, error: specializationError } =
-    await supabase
-      .from('specializations')
-      .select('id, department_id, is_active')
-      .eq('id', specializationId)
-      .maybeSingle()
+  // Specialization is optional.
+  // Validate it only when the user has selected one.
+  if (specializationId) {
+    const { data: specialization, error: specializationError } =
+      await supabase
+        .from('specializations')
+        .select('id, department_id, is_active')
+        .eq('id', specializationId)
+        .maybeSingle()
 
-  if (specializationError) {
-    throw new Error(specializationError.message)
-  }
+    if (specializationError) {
+      throw new Error(specializationError.message)
+    }
 
-  if (
-    !specialization ||
-    !specialization.is_active ||
-    specialization.department_id !== departmentId
-  ) {
-    throw new Error(
-      'Selected specialization does not belong to this department.'
-    )
+    if (
+      !specialization ||
+      !specialization.is_active ||
+      specialization.department_id !== departmentId
+    ) {
+      throw new Error(
+        'Selected specialization does not belong to this department.'
+      )
+    }
   }
 }
 
@@ -568,7 +572,6 @@ export async function createStudent({
       'academicTermId',
       'schoolId',
       'departmentId',
-      'specializationId',
       'academicYearLevel',
     ]
 
@@ -672,7 +675,7 @@ export async function createStudent({
           academic_term_id: academicPlacement.academicTermId,
           school_id: schoolId,
           department_id: academicPlacement.departmentId,
-          specialization_id: academicPlacement.specializationId,
+          specialization_id: academicPlacement.specializationId || null,
           academic_year_level: academicPlacement.academicYearLevel,
           division: academicPlacement.division?.trim() || null,
           roll_number: academicPlacement.rollNumber?.trim() || null,
@@ -784,4 +787,96 @@ export async function setStudentAccountStatus(
   if (!data) throw new Error('Student profile not found.')
 
   return data
+}
+
+// ======================================================
+// ASSIGN OR UPDATE STUDENT ACADEMIC RECORD
+// ======================================================
+
+export async function assignStudentAcademicRecord(
+  studentId,
+  schoolId,
+  placement
+) {
+  // Verify the student belongs to this school.
+  const student = await getStudentById(studentId, schoolId)
+
+  if (!student) {
+    throw new Error('Student not found in this school.')
+  }
+
+  // Ensure placement belongs to the same school.
+  if (placement.schoolId !== schoolId) {
+    throw new Error(
+      'Academic placement school must match the selected student school.'
+    )
+  }
+
+  // Reuse all existing academic placement validation.
+  await validateAcademicPlacement(placement)
+
+  // Check whether a record already exists for this semester.
+  const { data: existingRecord, error: existingError } =
+    await supabase
+      .from('student_academic_records')
+      .select('id, record_status')
+      .eq('student_id', studentId)
+      .eq('academic_term_id', placement.academicTermId)
+      .maybeSingle()
+
+  if (existingError) {
+    throw new Error(existingError.message)
+  }
+
+  const recordData = {
+    student_id: studentId,
+    academic_term_id: placement.academicTermId,
+    school_id: schoolId,
+    department_id: placement.departmentId,
+    specialization_id: placement.specializationId || null,
+    academic_year_level: placement.academicYearLevel,
+    division: placement.division?.trim() || null,
+    roll_number: placement.rollNumber?.trim() || null,
+    record_status: 'active',
+    updated_at: new Date().toISOString(),
+  }
+
+  let savedRecord
+
+  if (existingRecord) {
+    // Update only this semester's record.
+    const { data, error } = await supabase
+      .from('student_academic_records')
+      .update(recordData)
+      .eq('id', existingRecord.id)
+      .select()
+      .single()
+
+    if (error) throw new Error(error.message)
+
+    savedRecord = data
+  } else {
+    // Create a new semester record.
+    const { data, error } = await supabase
+      .from('student_academic_records')
+      .insert(recordData)
+      .select()
+      .single()
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(
+          'An academic record already exists for this student and semester. Please refresh and try again.'
+        )
+      }
+
+      throw new Error(error.message)
+    }
+
+    savedRecord = data
+  }
+
+  const academicHistory = await enrichAcademicRecords([savedRecord])
+
+  return academicHistory[0]
 }
