@@ -13,6 +13,7 @@ import authRoutes from './routes/authRoutes.js'
 import adminRoutes from './routes/adminRoutes.js'
 import schoolRoutes from './routes/schoolRoutes.js'
 import studentRoutes from './routes/studentRoutes.js'
+import facultyRoutes from './routes/facultyRoutes.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -104,6 +105,11 @@ app.use('/api/auth', authRoutes)
 // Protected by authenticateUser and authorizeRoles('student')
 // inside studentRoutes.js.
 app.use('/api/student', studentRoutes)
+
+// FACULTY DASHBOARD ROUTES
+// Protected by authenticateUser and authorizeRoles('faculty')
+// inside facultyRoutes.js.
+app.use('/api/faculty', facultyRoutes)
 
 // UNIVERSITY ADMIN ROUTES
 // Every Admin route is protected by authenticateUser

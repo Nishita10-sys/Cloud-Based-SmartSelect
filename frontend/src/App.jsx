@@ -18,6 +18,7 @@ import authService from './services/authService'
 import AdminDashboard from './components/admin/AdminDashboard'
 import SchoolDashboard from './components/school/SchoolDashboard'
 import StudentDashboard from './components/student/StudentDashboard'
+import FacultyDashboard from './components/faculty/FacultyDashboard'
 
 function App() {
   const [screen, setScreen] = useState('login')
@@ -356,6 +357,17 @@ if (screen === 'dashboard' && profile?.role === 'student') {
     />
   )
 }
+
+
+  // FACULTY DASHBOARD
+  if (screen === 'dashboard' && profile?.role === 'faculty') {
+    return (
+      <FacultyDashboard
+        profile={profile}
+        onLogout={handleLogout}
+      />
+    )
+  }
 
   // UNIVERSITY ADMIN DASHBOARD
   if (screen === 'dashboard' && profile?.role === 'admin') {
